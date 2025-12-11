@@ -4,7 +4,6 @@ import { createClient } from "../lib/supabase";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-// 👇 On ajoute 'mediaType' ici (par défaut 'anime' si on précise pas)
 export default function AddToListButton({ anime, mediaType = "anime" }: { anime: any, mediaType?: "anime" | "manga" }) {
   const [loading, setLoading] = useState(true);
   const [isAdded, setIsAdded] = useState(false);
@@ -17,13 +16,14 @@ export default function AddToListButton({ anime, mediaType = "anime" }: { anime:
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setLoading(false); return; }
 
+      // 👇 CORRECTION : On lit dans 'library' avec les bonnes colonnes
       const { data } = await supabase
-        .from("user_list")
+        .from("library")
         .select("id")
         .eq("user_id", user.id)
-        .eq("mal_id", anime.mal_id)
-        .eq("media_type", mediaType) // 👈 On vérifie aussi le type !
-        .single();
+        .eq("jikan_id", anime.mal_id) // On map mal_id vers jikan_id
+        .eq("type", mediaType)        // On map mediaType vers type
+        .maybeSingle(); // Utilise maybeSingle pour éviter les erreurs 406
 
       if (data) setIsAdded(true);
       setLoading(false);
@@ -44,34 +44,44 @@ export default function AddToListButton({ anime, mediaType = "anime" }: { anime:
     }
 
     if (isAdded) {
-      // SUPPRESSION
+      // SUPPRESSION (Table library)
       const { error } = await supabase
-        .from("user_list")
+        .from("library")
         .delete()
         .eq("user_id", user.id)
-        .eq("mal_id", anime.mal_id)
-        .eq("media_type", mediaType); // 👈 Important
+        .eq("jikan_id", anime.mal_id)
+        .eq("type", mediaType);
 
       if (!error) {
-    setIsAdded(false);
-    toast.info("Retiré de ta liste");
-}
+        setIsAdded(false);
+        toast.info("Retiré de ta bibliothèque");
+      } else {
+        toast.error("Erreur lors de la suppression");
+      }
     } else {
-      // AJOUT
-      const { error } = await supabase.from("user_list").upsert({
+      // AJOUT (Table library)
+      // On sécurise l'image car Jikan change parfois de structure
+      const imageUrl = anime.images?.jpg?.large_image_url || anime.images?.jpg?.image_url;
+
+      const { error } = await supabase.from("library").upsert({
         user_id: user.id,
-        mal_id: anime.mal_id,
+        jikan_id: anime.mal_id, // Important : nom de colonne SQL
         title: anime.title,
-        image_url: anime.images?.jpg?.large_image_url,
+        image_url: imageUrl,
         status: "plan_to_watch",
         score: 0,
-        media_type: mediaType // 👈 On sauvegarde le type dans la base
-      }, { onConflict: 'user_id, mal_id, media_type' }); // 👈 Nouvelle contrainte
+        type: mediaType // Important : nom de colonne SQL
+      }, 
+      // La contrainte d'unicité définie dans le SQL précédent
+      { onConflict: 'user_id, jikan_id, type' }); 
 
       if (!error) {
-    setIsAdded(true);
-    toast.success(`Ajouté à ta liste ${mediaType} !`); // Message stylé
-}
+        setIsAdded(true);
+        toast.success(`Ajouté à ta collection ${mediaType} !`);
+      } else {
+        console.error(error);
+        toast.error("Erreur lors de l'ajout");
+      }
     }
     setLoading(false);
     router.refresh();
@@ -83,10 +93,18 @@ export default function AddToListButton({ anime, mediaType = "anime" }: { anime:
     <button
       onClick={handleToggle}
       className={`mt-4 w-full font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transform active:scale-95 transition ${
-        isAdded ? "bg-red-500/10 text-red-400 border border-red-500/50" : "bg-purple-600 text-white"
+        isAdded ? "bg-red-500/10 text-red-400 border border-red-500/50" : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg"
       }`}
     >
-      {isAdded ? "Retirer de ma liste" : "Ajouter à ma liste"}
+      {isAdded ? (
+        <>
+            <span>🗑️</span> Retirer de ma liste
+        </>
+      ) : (
+        <>
+            <span>➕</span> Ajouter à ma liste
+        </>
+      )}
     </button>
   );
 }

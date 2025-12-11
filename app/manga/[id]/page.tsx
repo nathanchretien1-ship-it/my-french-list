@@ -64,8 +64,7 @@ export default async function MangaPage({ params }: { params: Promise<{ id: stri
             </div>
             
             {/* 👇 LE BOUTON MAGIQUE CONFIGURÉ POUR MANGA 👇 */}
-            <AddToListButton anime={manga} mediaType="manga" />
-          </div>
+              <AddToListButton anime={manga} mediaType="manga" />          </div>
 
           {/* COLONNE DROITE (Infos) */}
           <div className="flex-1 pt-4 md:pt-10 text-center md:text-left">

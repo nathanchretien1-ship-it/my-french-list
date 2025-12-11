@@ -1,19 +1,31 @@
-import { getRank } from "../lib/ranks"; // Assure-toi que le chemin est bon
+import { getRank } from "../lib/ranks";
 
-export default function UserBadge({ role, isPremium, animeCount = 0 }: { role: string, isPremium: boolean, animeCount?: number }) {
-  // 1. Nettoyage du rôle
+// 👇 J'ai ajouté 'isAdmin' dans les propriétés (props)
+export default function UserBadge({ 
+  role, 
+  isAdmin = false, // Par défaut faux
+  isPremium, 
+  animeCount = 0 
+}: { 
+  role: string, 
+  isAdmin?: boolean, // Le ? rend la propriété optionnelle
+  isPremium: boolean, 
+  animeCount?: number 
+}) {
+  
   const normalizedRole = role?.toLowerCase().trim() || 'member';
 
-  // 2. On récupère le grade basé sur les animes vus
-  // On passe 'false' en 2ème paramètre pour forcer le calcul du grade d'anime (ex: "Super Saiyan")
-  // même si on est admin. Le badge Admin sera affiché séparément juste en dessous.
+  // 👇 COMBINAISON : On est Admin si le rôle est 'admin' OU si la case isAdmin est vraie
+  const showAdminBadge = normalizedRole === 'admin' || isAdmin === true;
+
+  // Récupération du rang d'anime
   const progressionRank = getRank(animeCount, false);
 
   return (
     <div className="flex gap-2 mt-2 flex-wrap items-center">
       
       {/* --- BADGE ADMIN (Rouge) --- */}
-      {normalizedRole === 'admin' && (
+      {showAdminBadge && (
         <div className="flex items-center gap-1 bg-red-600/20 border border-red-500 text-red-400 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide shadow-[0_0_10px_rgba(220,38,38,0.3)]">
           <span className="text-xs">👑</span>
           Admin
@@ -37,8 +49,7 @@ export default function UserBadge({ role, isPremium, animeCount = 0 }: { role: s
         </div>
       )}
 
-      {/* --- BADGE DE PROGRESSION (Ton fichier ranks.ts) --- */}
-      {/* On n'affiche pas PNJ (0 animes) pour ne pas encombrer, sauf si tu veux */}
+      {/* --- BADGE DE PROGRESSION --- */}
       {animeCount >= 0 && (
         <div className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide ${progressionRank.color}`}>
           <span className="text-xs">{progressionRank.emoji}</span>
@@ -46,11 +57,9 @@ export default function UserBadge({ role, isPremium, animeCount = 0 }: { role: s
         </div>
       )}
       
-      {/* Compteur discret */}
       <div className="text-[10px] text-gray-500 font-mono ml-1 opacity-60">
         ({animeCount} vus)
       </div>
-
     </div>
   );
 }

@@ -56,7 +56,7 @@ export default async function AnimePage({ params }: { params: Promise<{ id: stri
               )}
             </div>
             
-            <AddToListButton anime={anime} />
+            <AddToListButton anime={anime} mediaType="anime" />
           </div>
 
           {/* Infos (Colonne Droite) */}
