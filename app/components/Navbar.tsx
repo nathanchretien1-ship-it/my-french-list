@@ -11,13 +11,25 @@ export default function Navbar() {
   const [user, setUser] = useState<any>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [pseudo, setPseudo] = useState<string>("");
-  const [unreadCount, setUnreadCount] = useState<number>(0); // Nouveau state pour les notifs
+  const [unreadCount, setUnreadCount] = useState<number>(0);
   
   const supabase = createClient();
   const router = useRouter();
 
+  // Fonction pour compter les messages (extraite pour être réutilisée)
+  const fetchUnreadCount = async (userId: string) => {
+    const { count } = await supabase
+      .from('messages')
+      .select('*', { count: 'exact', head: true })
+      .eq('receiver_id', userId)
+      .eq('is_read', false);
+    setUnreadCount(count || 0);
+  };
+
   useEffect(() => {
-    const getData = async () => {
+    let channel: any;
+
+    const init = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
 
@@ -37,60 +49,46 @@ export default function Navbar() {
           }
         }
 
-        // 2. Compter les messages non lus initiaux
-        const fetchUnread = async () => {
-          const { count } = await supabase
-            .from('messages')
-            .select('*', { count: 'exact', head: true })
-            .eq('receiver_id', user.id)
-            .eq('is_read', false);
-          setUnreadCount(count || 0);
-        };
-        fetchUnread();
+        // 2. Compteur initial
+        await fetchUnreadCount(user.id);
 
-        // 3. Écouter les nouveaux messages en temps réel (pour incrémenter le badge)
-        const channel = supabase
-          .channel('navbar_notifications')
+        // 3. Temps Réel Intelligent
+        channel = supabase
+          .channel('navbar_global_notifications')
           .on(
             'postgres_changes',
             {
-              event: 'INSERT',
+              event: '*', // On écoute TOUT (Insert et Update)
               schema: 'public',
               table: 'messages',
-              filter: `receiver_id=eq.${user.id}`,
+              filter: `receiver_id=eq.${user.id}`, // On écoute seulement ce qu'on REÇOIT
             },
-            () => {
-              // Si on reçoit un message, on met à jour le compteur
-              fetchUnread();
-              toast.info("Nouveau message reçu !");
+            (payload: any) => {
+              // A. Mise à jour du compteur dans tous les cas
+              fetchUnreadCount(user.id);
+
+              // B. Notification Toast UNIQUEMENT si c'est un NOUVEAU message
+              // ET que l'expéditeur n'est pas moi (sécurité doublon)
+              if (payload.eventType === 'INSERT' && payload.new.sender_id !== user.id) {
+                toast.info("💬 Nouveau message reçu !");
+              }
             }
           )
-          .on(
-            'postgres_changes',
-            {
-              event: 'UPDATE', // Si on lit un message ailleurs, on met à jour le compteur
-              schema: 'public',
-              table: 'messages',
-              filter: `receiver_id=eq.${user.id}`,
-            },
-            () => fetchUnread()
-          )
           .subscribe();
-
-        return () => {
-          supabase.removeChannel(channel);
-        };
       }
     };
 
-    getData();
+    init();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
       router.refresh();
-      getData();
+      // On pourrait relancer init() ici si besoin
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+      subscription.unsubscribe();
+    };
   }, [router, supabase]);
 
   const handleLogout = async () => {
@@ -99,7 +97,7 @@ export default function Navbar() {
     setAvatarUrl(null);
     setPseudo("");
     setUnreadCount(0);
-    toast.info("Déconnexion réussie");
+    toast.info("À bientôt !");
     router.push("/"); 
     router.refresh(); 
   };
@@ -128,13 +126,15 @@ export default function Navbar() {
               Communauté
             </Link>
 
-            {/* --- LIEN MESSAGES AVEC BADGE --- */}
             {user && (
               <Link href="/messages" className="relative text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition hidden sm:block">
-                Messages 💬
+                Messages
                 {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full animate-pulse">
-                    {unreadCount > 9 ? '9+' : unreadCount}
+                  <span className="absolute top-1 right-0 flex h-4 w-4">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-4 w-4 bg-red-500 text-[9px] text-white justify-center items-center">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
                   </span>
                 )}
               </Link>
