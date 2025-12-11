@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  /* Un fond sombre profond avec une touche de bleu nuit */
+  background: radial-gradient(circle at top center, #1e293b, #020617);
+  color: #ffffff;
+  /* 👇 C'était ici l'erreur. Voici la version correcte : */
+  min-height: 100vh;
+}
+
+/* Pour masquer les barres de défilement moches */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #020617;
+}
+::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
+}
