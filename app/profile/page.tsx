@@ -261,6 +261,7 @@ export default function ProfilePage() {
                             <span>{statusEmoji}</span><span>{statusText || "Définir un statut..."}</span>
                         </div>
                     </div>
+                    {/*---test---*/}
                     <UserBadge role={role} isPremium={isPremium} animeCount={animeCount} isAdmin={isAdminUser}/>
                 </div>
                 
