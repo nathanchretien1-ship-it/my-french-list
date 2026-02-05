@@ -26,50 +26,80 @@ export default function Navbar() {
     setUnreadCount(count || 0);
   };
 
+  // 1. Fonction d'initialisation des données utilisateur
+  const init = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    setUser(user);
+
+    if (user) {
+      // Profil
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("username, avatar_url")
+        .eq("id", user.id)
+        .single();
+
+      if (profile) {
+        setPseudo(profile.username || user.email?.split('@')[0] || "Mon Profil");
+        if (profile.avatar_url) {
+          const { data } = supabase.storage.from("avatars").getPublicUrl(profile.avatar_url);
+          setAvatarUrl(`${data.publicUrl}?t=${new Date().getTime()}`);
+        }
+      } else {
+        // Fallback si le profil n'existe pas encore
+        setPseudo(user.email?.split('@')[0] || "Mon Profil");
+        setAvatarUrl(null);
+      }
+
+      // Compteur initial
+      await fetchUnreadCount(user.id);
+    } else {
+      // Reset si pas d'utilisateur
+      setUser(null);
+      setAvatarUrl(null);
+      setPseudo("");
+      setUnreadCount(0);
+    }
+  };
+
   useEffect(() => {
     let channel: any;
 
-    const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
+    init(); // Chargement initial
 
-      if (user) {
-        // 1. Profil
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("username, avatar_url")
-          .eq("id", user.id)
-          .single();
+    // 2. ÉCOUTEUR DE CHANGEMENT D'AUTH (CORRECTION ICI)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+        await init(); // On relance l'initialisation complète
+        router.refresh();
+      }
+      if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setAvatarUrl(null);
+        setPseudo("");
+        setUnreadCount(0);
+        router.refresh();
+      }
+    });
 
-        if (profile) {
-          setPseudo(profile.username || user.email?.split('@')[0] || "Mon Profil");
-          if (profile.avatar_url) {
-            const { data } = supabase.storage.from("avatars").getPublicUrl(profile.avatar_url);
-            setAvatarUrl(`${data.publicUrl}?t=${new Date().getTime()}`);
-          }
-        }
-
-        // 2. Compteur initial
-        await fetchUnreadCount(user.id);
-
-        // 3. Temps Réel Intelligent
+    // 3. Temps Réel pour les messages (déplacé dans un effet séparé ou géré ici)
+    // On ne l'active que si on a un user
+    const setupRealtime = async () => {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (currentUser) {
         channel = supabase
           .channel('navbar_global_notifications')
           .on(
             'postgres_changes',
             {
-              event: '*', // On écoute TOUT (Insert et Update)
+              event: '*',
               schema: 'public',
               table: 'messages',
-              filter: `receiver_id=eq.${user.id}`, // On écoute seulement ce qu'on REÇOIT
+              filter: `receiver_id=eq.${currentUser.id}`,
             },
             (payload: any) => {
-              // A. Mise à jour du compteur dans tous les cas
-              fetchUnreadCount(user.id);
-
-              // B. Notification Toast UNIQUEMENT si c'est un NOUVEAU message
-              // ET que l'expéditeur n'est pas moi (sécurité doublon)
-              if (payload.eventType === 'INSERT' && payload.new.sender_id !== user.id) {
+              fetchUnreadCount(currentUser.id);
+              if (payload.eventType === 'INSERT' && payload.new.sender_id !== currentUser.id) {
                 toast.info("💬 Nouveau message reçu !");
               }
             }
@@ -77,13 +107,7 @@ export default function Navbar() {
           .subscribe();
       }
     };
-
-    init();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
-      router.refresh();
-      // On pourrait relancer init() ici si besoin
-    });
+    setupRealtime();
 
     return () => {
       if (channel) supabase.removeChannel(channel);
@@ -93,13 +117,8 @@ export default function Navbar() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    setUser(null);
-    setAvatarUrl(null);
-    setPseudo("");
-    setUnreadCount(0);
     toast.info("À bientôt !");
     router.push("/"); 
-    router.refresh(); 
   };
 
   return (
