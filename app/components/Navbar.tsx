@@ -6,6 +6,7 @@ import { createClient } from "../lib/supabase";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import SearchBar from "../components/SearchBar";
+import { usePathname } from "next/navigation"; // 👈 Ajoutez cet import
 
 export default function Navbar() {
   const [user, setUser] = useState<any>(null);
@@ -15,6 +16,8 @@ export default function Navbar() {
   
   const [supabase] = useState(() => createClient());
   const router = useRouter();
+  const pathname = usePathname(); // 👈 Récupérez l'URL actuelle
+
 
   // Fonction pour compter les messages non lus
   const fetchUnreadCount = useCallback(async (userId: string) => {
@@ -79,6 +82,7 @@ export default function Navbar() {
 
     // Écouteur de changement d'état d'authentification
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (pathname === '/auth') return;
       if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
         await init(); // On recharge toutes les infos
         router.refresh();
