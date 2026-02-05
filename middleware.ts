@@ -46,6 +46,6 @@ export const config = {
      * - images (svg, png, etc.)
      * - auth/callback (route d'authentification) 👈 AJOUT ICI
      */
-    '/((?!_next/static|_next/image|favicon.ico|auth/callback|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+'/((?!_next/static|_next/image|favicon.ico|auth/callback|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
