@@ -7,9 +7,14 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import SearchBar from "../components/SearchBar";
 import { usePathname } from "next/navigation"; // 👈 Ajoutez cet import
+import { User } from "@supabase/supabase-js"; // Ajoutez cet import pour le 
 
-export default function Navbar() {
-  const [user, setUser] = useState<any>(null);
+interface NavbarProps {
+  user: User | null;
+}
+
+export default function Navbar({ user: initialUser }: NavbarProps) {
+  const [user, setUser] = useState<any>(initialUser);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [pseudo, setPseudo] = useState<string>("");
   const [unreadCount, setUnreadCount] = useState<number>(0);
@@ -53,21 +58,11 @@ export default function Navbar() {
             const { data } = supabase.storage.from("avatars").getPublicUrl(profile.avatar_url);
             // Ajout d'un timestamp pour éviter le cache navigateur sur l'image
             setAvatarUrl(`${data.publicUrl}?t=${new Date().getTime()}`);
-          } else {
-            setAvatarUrl(null);
-          }
-        } else {
-          setPseudo(currentUser.email?.split('@')[0] || "Mon Profil");
-        }
+          } 
+        } 
+        await fetchUnreadCount(currentUser.id);
 
         // 2. Récupération des messages
-        await fetchUnreadCount(currentUser.id);
-      } else {
-        // Reset des états si déconnecté
-        setUser(null);
-        setAvatarUrl(null);
-        setPseudo("");
-        setUnreadCount(0);
       }
     } catch (error) {
       console.error("Erreur lors de l'initialisation de la Navbar:", error);
@@ -78,11 +73,17 @@ export default function Navbar() {
     let channel: any;
 
     // Chargement initial au montage du composant
-    init();
-
+    if (initialUser) {
+        // Optionnel : on peut optimiser en ne refetchant pas l'user tout de suite
+        // mais pour l'instant, appelons init() pour charger l'avatar et le pseudo
+        init(); 
+    } else {
+        init();
+    }
     // Écouteur de changement d'état d'authentification
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (pathname === '/auth') return;
+
       if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
         await init(); // On recharge toutes les infos
         router.refresh();

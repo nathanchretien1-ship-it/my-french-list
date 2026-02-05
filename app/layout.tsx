@@ -30,7 +30,7 @@ export default async function RootLayout({
   />
       </head>
       <body className={inter.className}>
-        <Navbar />
+        <Navbar user={user} />
         {/* 👇 AJOUTE ÇA ICI */}
         <Toaster position="bottom-right" richColors theme="dark" />
         
