@@ -13,7 +13,7 @@ export default function Navbar() {
   const [pseudo, setPseudo] = useState<string>("");
   const [unreadCount, setUnreadCount] = useState<number>(0);
   
-  const supabase = createClient();
+  const [supabase] = useState(() => createClient());
   const router = useRouter();
 
   // Fonction pour compter les messages non lus
