@@ -18,6 +18,18 @@ export default function Navbar({ user: initialUser }: NavbarProps) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [pseudo, setPseudo] = useState<string>("");
   const [unreadCount, setUnreadCount] = useState<number>(0);
+
+
+  useEffect(() => {
+    setUser(initialUser);
+    if (!initialUser) {
+        // Si déconnecté, on vide tout
+        setAvatarUrl(null);
+        setPseudo("");
+        setUnreadCount(0);
+    } 
+    // Si connecté, le useEffect suivant lancera init() pour l'avatar
+  }, [initialUser]);
   
   const [supabase] = useState(() => createClient());
   const router = useRouter();
@@ -41,31 +53,44 @@ export default function Navbar({ user: initialUser }: NavbarProps) {
   // Fonction d'initialisation des données utilisateur (Profil + Messages)
   const init = useCallback(async () => {
     try {
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      setUser(currentUser);
+      const currentUser = user || initialUser;
 
       if (currentUser) {
-        // 1. Récupération du profil
         const { data: profile } = await supabase
           .from("profiles")
           .select("username, avatar_url")
           .eq("id", currentUser.id)
           .single();
 
-        if (profile) {
-          setPseudo(profile.username || currentUser.email?.split('@')[0] || "Mon Profil");
-          if (profile.avatar_url) {
-            const { data } = supabase.storage.from("avatars").getPublicUrl(profile.avatar_url);
-            // Ajout d'un timestamp pour éviter le cache navigateur sur l'image
-            setAvatarUrl(`${data.publicUrl}?t=${new Date().getTime()}`);
-          } 
-        } 
-        await fetchUnreadCount(currentUser.id);
+        // 1. Gestion du Pseudo (Profil > Google > Email)
+        const username = profile?.username 
+          || currentUser.user_metadata?.full_name 
+          || currentUser.email?.split('@')[0] 
+          || "Mon Profil";
+        setPseudo(username);
 
-        // 2. Récupération des messages
+        // 2. Gestion de l'Avatar (Profil > Google > Rien)
+        if (profile?.avatar_url) {
+          // Cas A : L'utilisateur a uploadé sa propre image sur Supabase
+          const { data } = supabase.storage.from("avatars").getPublicUrl(profile.avatar_url);
+          setAvatarUrl(`${data.publicUrl}?t=${new Date().getTime()}`);
+        } else if (currentUser.user_metadata?.avatar_url || currentUser.user_metadata?.picture) {
+          // Cas B : Pas d'image perso, on prend celle de Google (avatar_url ou picture)
+          setAvatarUrl(currentUser.user_metadata.avatar_url || currentUser.user_metadata.picture);
+        } else {
+          // Cas C : Aucune image, on affichera l'initiale
+          setAvatarUrl(null);
+        }
+
+        await fetchUnreadCount(currentUser.id);
+      } else {
+        setUser(null);
+        setAvatarUrl(null);
+        setPseudo("");
+        setUnreadCount(0);
       }
     } catch (error) {
-      console.error("Erreur lors de l'initialisation de la Navbar:", error);
+      console.error("Erreur init navbar:", error);
     }
   }, [supabase, fetchUnreadCount]);
 
@@ -131,9 +156,15 @@ export default function Navbar({ user: initialUser }: NavbarProps) {
 
   const handleLogout = async () => {
     try {
-      await supabase.auth.signOut();
+      // On appelle la route serveur pour nettoyer les cookies proprement
+      await fetch("/auth/signout", { method: "POST" });
+      
+      // On vide le state local immédiatement (optimiste)
+      setUser(null);
+      setAvatarUrl(null);
+      
       toast.info("À bientôt !");
-      router.push("/"); 
+      router.refresh(); // Rafraîchit la page pour que le layout sache qu'on est parti
     } catch (err) {
       console.error("Erreur déconnexion:", err);
     }
