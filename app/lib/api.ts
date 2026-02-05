@@ -27,7 +27,8 @@ function translateStatus(status: string): string {
 // Fonction FETCH sécurisée avec Gestion d'Erreur
 async function fetchWithCache(endpoint: string, revalidateTime: number) {
   // 1. On attend 500ms avant chaque requête pour être gentil avec l'API
-  await delay(500);
+  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+  await delay(800);
 
   try {
     // 2. On lance la requête avec un Timeout de 10 secondes (si ça prend plus, on annule)

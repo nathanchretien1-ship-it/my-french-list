@@ -1,31 +1,37 @@
 import { MetadataRoute } from 'next';
+import { createClient } from './lib/supabase/server';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = 'https://myfrenchlist.fr'; // 👈 Remplace par ton vrai domaine
+  const baseUrl = 'https://votre-domaine.com'; // À modifier par ton vrai domaine
+  const supabase = await createClient();
 
-  // Si tu as des pages dynamiques (ex: des articles de blog depuis Supabase)
-  // Tu peux les fetcher ici :
-  // const posts = await fetchPostsFromSupabase();
-  
-  const routes = [
+  // On récupère les IDs uniques de ta table library pour générer les pages de détails
+  const { data: items } = await supabase
+    .from('library')
+    .select('jikan_id, type');
+
+  const dynamicEntries = (items || []).map((item) => ({
+    url: `${baseUrl}/${item.type === 'manga' ? 'manga' : 'anime'}/${item.jikan_id}`,
+    lastModified: new Date().toISOString().split('T')[0],
+    changeFrequency: 'monthly' as const,
+    priority: 0.6,
+  }));
+
+  const staticRoutes = [
     '',
-    '/anime',
-    '/friends',
-    '/auth',
-    '/manga',
-    '/messages',
-    '/profile',
-    '/search',
     '/season',
     '/season/upcoming',
-    '/user',
-    // Ajoute tes routes statiques ici
+    '/search',
+    '/gacha',
+    '/friends',
+    '/messages',
+    '/auth',
   ].map((route) => ({
     url: `${baseUrl}${route}`,
     lastModified: new Date().toISOString().split('T')[0],
-    changeFrequency: 'weekly' as const,
+    changeFrequency: 'daily' as const,
     priority: route === '' ? 1 : 0.8,
   }));
 
-  return [...routes];
+  return [...staticRoutes, ...dynamicEntries];
 }

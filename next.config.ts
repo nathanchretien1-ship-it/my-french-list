@@ -17,6 +17,10 @@ const nextConfig = {
       { protocol: 'https',
          hostname: 'bit.ly' 
       },
+      {
+        protocol: 'https',
+        hostname: '**.googleusercontent.com', // Pour les avatars Google
+      },
     ],
   },
   typescript: {
@@ -25,6 +29,7 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  reactStrictMode: false,
 };
 
 export default nextConfig;
