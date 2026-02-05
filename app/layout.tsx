@@ -4,8 +4,7 @@ import "./globals.css";
 import Navbar from "./components/Navbar";
 import { Toaster } from "sonner"; // 👈 IMPORT
 import Script from "next/script";
-import { createClient } from "./lib/supabase";
-
+import { createClient } from "./lib/supabase/server";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
