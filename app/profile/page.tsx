@@ -100,7 +100,26 @@ export default function ProfilePage() {
       }
 
       // 3. Profil
-      const { data } = await supabase.from("profiles").select("*,is_admin").eq("id", user.id).maybeSingle();
+      const { data: fetchedData } = await supabase.from("profiles").select("*,is_admin").eq("id", user.id).maybeSingle();
+      let data = fetchedData;
+      
+      if (!data) {
+          console.log("⚠️ Profil introuvable, tentative de réparation...");
+          const newProfile = {
+            id: user.id,
+            username: user.user_metadata?.full_name || user.email?.split('@')[0] || "Nouveau",
+            avatar_url: user.user_metadata?.avatar_url || null,
+            updated_at: new Date().toISOString()
+          };
+          
+          // On force la création
+          const { error: insertError } = await supabase.from("profiles").upsert(newProfile);
+          
+          if (!insertError) {
+             data = newProfile; // On utilise le nouveau profil immédiatement
+             console.log("✅ Profil réparé !");
+          }
+      }
       if (data) {
         setUsername(data.username || "");
         setOriginalUsername(data.username || "");
