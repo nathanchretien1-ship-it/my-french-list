@@ -18,8 +18,7 @@ export default function AuthPage() {
   const [checkingUsername, setCheckingUsername] = useState(false);
   
   const router = useRouter();
-  const supabase = createClient();
-
+const [supabase] = useState(() => createClient());
   // --- 1. CONNEXION GOOGLE ---
   const handleGoogleLogin = async () => {
     try {
@@ -69,18 +68,28 @@ export default function AuthPage() {
   // --- 4. GESTION EMAIL/PASSWORD ---
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("connexion en cours ... 1/X")
     setLoading(true);
+      console.log("connexion en cours ... 2/X")
 
     try {
+            console.log("connexion en cours ... 3/X")
+
       if (isLogin) {
+              console.log("connexion en cours ... 4/X")
+
         const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
         if (error) throw error;
+        console.log("connexion en cours ... 6/X")
         toast.success("Connexion réussie !");
-        window.location.href = "/"; 
+        router.refresh(); // Rafraîchit les Server Components (comme le layout) pour mettre à jour la session
+        router.push("/"); // Navigue vers l'accueil
       } else {
+              console.log("connexion en cours ... 5/X")
+
         const passwordError = validatePassword(password);
         if (passwordError) throw new Error(passwordError);
 

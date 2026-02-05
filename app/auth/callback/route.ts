@@ -13,21 +13,22 @@ export async function GET(request: Request) {
     // On échange le code temporaire contre une vraie session utilisateur
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     
-    if (!error) {
-      // Si tout est bon, on redirige vers l'accueil (ou la page demandée)
-      const forwardedHost = request.headers.get('x-forwarded-host'); // Pour gérer le déploiement Vercel
-      const isLocalEnv = process.env.NODE_ENV === 'development';
-      
-      if (isLocalEnv) {
-        // En local
-        return NextResponse.redirect(`${origin}${next}`);
-      } else if (forwardedHost) {
-        // Sur Vercel (Production)
-        return NextResponse.redirect(`https://${forwardedHost}${next}`);
-      } else {
-        return NextResponse.redirect(`${origin}${next}`);
-      }
-    }
+   // app/auth/callback/route.ts
+if (!error) {
+  const forwardedHost = request.headers.get('x-forwarded-host');
+  const isLocalEnv = process.env.NODE_ENV === 'development';
+  
+  // URL de redirection finale
+  const redirectUrl = isLocalEnv 
+    ? `${origin}${next}` 
+    : (forwardedHost ? `https://${forwardedHost}${next}` : `${origin}${next}`);
+
+  // On ajoute un paramètre de cache-busting pour forcer Next.js à rafraîchir la session
+  const finalUrl = new URL(redirectUrl);
+  // finalUrl.searchParams.set('t', Date.now().toString()); // Optionnel
+
+  return NextResponse.redirect(finalUrl.toString());
+}
   }
 
   // Si erreur, retour à la case départ
