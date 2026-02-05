@@ -32,9 +32,17 @@ export async function middleware(request: NextRequest) {
   )
 
   // Très important : cela rafraîchit la session si elle expire
+  // middleware.ts
+// ... reste du code
+try {
+  // Cela rafraîchit la session si nécessaire
   await supabase.auth.getUser()
+} catch (e) {
+  console.error("Erreur de connexion à Supabase dans le middleware:", e)
+  // En cas d'échec de fetch, on laisse passer ou on redirige selon votre besoin
+}
 
-  return response
+return response
 }
 
 export const config = {

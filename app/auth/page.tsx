@@ -9,31 +9,45 @@ export default function AuthPage() {
   const [loading, setLoading] = useState(false);
   const [checkEmailMsg, setCheckEmailMsg] = useState(false);
 
-  // Champs
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [username, setUsername] = useState("");
 
-  // Validation
   const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
   const [checkingUsername, setCheckingUsername] = useState(false);
   
   const router = useRouter();
   const supabase = createClient();
 
-  // --- 1. VALIDATION DU MOT DE PASSE (Sécurité) ---
-  const validatePassword = (pwd: string) => {
-    if (pwd.length < 8) return "Le mot de passe doit faire au moins 8 caractères.";
-    if (!/[A-Z]/.test(pwd)) return "Il faut au moins une majuscule (A-Z).";
-    if (!/[a-z]/.test(pwd)) return "Il faut au moins une minuscule (a-z).";
-    if (!/[0-9]/.test(pwd)) return "Il faut au moins un chiffre (0-9).";
-    // Optionnel : Caractère spécial
-    // if (!/[!@#$%^&*]/.test(pwd)) return "Il faut un caractère spécial (!@#$...).";
-    return null; // Tout est bon
+  // --- 1. CONNEXION GOOGLE ---
+  const handleGoogleLogin = async () => {
+    try {
+      setLoading(true);
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          // Redirige vers ton callback pour gérer la session proprement
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+      if (error) throw error;
+    } catch (err: any) {
+      toast.error(err.message || "Erreur lors de la connexion Google");
+      setLoading(false);
+    }
   };
 
-  // --- 2. VÉRIFICATION PSEUDO EN TEMPS RÉEL ---
+  // --- 2. VALIDATION DU MOT DE PASSE ---
+  const validatePassword = (pwd: string) => {
+    if (pwd.length < 8) return "Le mot de passe doit faire au moins 8 caractères.";
+    if (!/[A-Z]/.test(pwd)) return "Il faut au moins une majuscule.";
+    if (!/[a-z]/.test(pwd)) return "Il faut au moins une minuscule.";
+    if (!/[0-9]/.test(pwd)) return "Il faut au moins un chiffre.";
+    return null;
+  };
+
+  // --- 3. VÉRIFICATION PSEUDO ---
   useEffect(() => {
     if (isLogin || username.length < 3) {
       setUsernameAvailable(null);
@@ -52,67 +66,46 @@ export default function AuthPage() {
     return () => clearTimeout(timer);
   }, [username, isLogin, supabase]);
 
-  // --- 3. GESTION DE LA CONNEXION / INSCRIPTION ---
+  // --- 4. GESTION EMAIL/PASSWORD ---
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
       if (isLogin) {
-        // >>> CONNEXION <<<
         const { error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
         if (error) throw error;
-        
         toast.success("Connexion réussie !");
-        
-        // IMPORTANT : On rafraîchit d'abord pour mettre à jour la Navbar
-        router.refresh(); 
-        // Puis on redirige
-        router.replace("/"); 
-
+        window.location.href = "/"; 
       } else {
-        // >>> INSCRIPTION SÉCURISÉE <<<
-        
-        // A. Vérifier la complexité du mot de passe
         const passwordError = validatePassword(password);
-        if (passwordError) {
-          throw new Error(passwordError);
-        }
+        if (passwordError) throw new Error(passwordError);
 
-        // B. Vérifier la correspondance
         if (password !== confirmPassword) {
           throw new Error("Les mots de passe ne correspondent pas.");
         }
 
-        // C. Vérifier le pseudo
-        if (username.length < 3) {
-          throw new Error("Le pseudo est trop court.");
-        }
-        if (usernameAvailable === false) {
-          throw new Error("Ce pseudo est déjà pris.");
-        }
+        if (username.length < 3) throw new Error("Le pseudo est trop court.");
+        if (usernameAvailable === false) throw new Error("Ce pseudo est déjà pris.");
 
-        // D. Création du compte
         const { error } = await supabase.auth.signUp({
           email,
           password,
           options: {
-            data: { username: username }, // Métadonnée pour le trigger SQL
-            emailRedirectTo: `${location.origin}/auth/callback`,
+            data: { username: username },
+            emailRedirectTo: `${window.location.origin}/auth/callback`,
           },
         });
 
         if (error) throw error;
-
         setCheckEmailMsg(true);
         toast.success("Compte créé ! Vérifie tes emails.");
       }
     } catch (err: any) {
       toast.error(err.message || "Une erreur est survenue");
-    } finally {
       setLoading(false);
     }
   };
@@ -123,13 +116,8 @@ export default function AuthPage() {
         <div className="w-full max-w-md bg-slate-900/80 p-8 rounded-2xl border border-white/10 text-center">
           <div className="text-5xl mb-4">📩</div>
           <h2 className="text-2xl font-bold text-white mb-2">Vérifie ta boîte mail</h2>
-          <p className="text-gray-400 mb-6">
-            Un lien a été envoyé à <strong>{email}</strong>.<br/>
-            Clique dessus pour valider ton compte.
-          </p>
-          <button onClick={() => setCheckEmailMsg(false)} className="text-purple-400 hover:underline">
-            Retour
-          </button>
+          <p className="text-gray-400 mb-6">Un lien a été envoyé à <strong>{email}</strong>.</p>
+          <button onClick={() => setCheckEmailMsg(false)} className="text-purple-400 hover:underline">Retour</button>
         </div>
       </div>
     );
@@ -143,9 +131,22 @@ export default function AuthPage() {
           {isLogin ? "Connexion" : "Créer un compte"}
         </h2>
 
+        {/* BOUTON GOOGLE */}
+        <button
+          onClick={handleGoogleLogin}
+          disabled={loading}
+          className="w-full flex items-center justify-center gap-3 bg-white text-gray-900 font-semibold py-3 rounded-lg hover:bg-gray-100 transition mb-6 disabled:opacity-50"
+        >
+          <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
+          Continuer avec Google
+        </button>
+
+        <div className="relative mb-6">
+          <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10"></div></div>
+          <div className="relative flex justify-center text-sm"><span className="px-2 bg-slate-900 text-gray-500">OU</span></div>
+        </div>
+
         <form onSubmit={handleAuth} className="space-y-4">
-          
-          {/* PSEUDO (Inscription seulement) */}
           {!isLogin && (
             <div>
               <label className="block text-sm font-medium text-gray-400 mb-1">Pseudo</label>
@@ -156,21 +157,13 @@ export default function AuthPage() {
                   onChange={(e) => setUsername(e.target.value)}
                   required
                   className={`w-full bg-slate-800 border rounded-lg p-3 text-white focus:outline-none transition ${
-                    usernameAvailable === false ? "border-red-500 focus:ring-red-500" : 
-                    usernameAvailable === true ? "border-green-500 focus:ring-green-500" : 
-                    "border-slate-700 focus:ring-purple-500"
+                    usernameAvailable === false ? "border-red-500" : usernameAvailable === true ? "border-green-500" : "border-slate-700 focus:ring-purple-500"
                   }`}
-                  placeholder="OtakuKing99"
                 />
-                <div className="absolute right-3 top-3 text-sm">
-                  {checkingUsername ? "..." : (username.length >= 3 && (usernameAvailable ? "✅" : "❌"))}
-                </div>
               </div>
-              {usernameAvailable === false && <p className="text-xs text-red-400 mt-1">Pseudo indisponible</p>}
             </div>
           )}
 
-          {/* EMAIL */}
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-1">Email</label>
             <input
@@ -178,12 +171,10 @@ export default function AuthPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-purple-500 focus:outline-none"
-              placeholder="exemple@email.com"
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-purple-500 outline-none"
             />
           </div>
           
-          {/* MOT DE PASSE */}
           <div>
             <label className="block text-sm font-medium text-gray-400 mb-1">Mot de passe</label>
             <input
@@ -191,17 +182,10 @@ export default function AuthPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-purple-500 focus:outline-none"
-              placeholder="••••••••"
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-purple-500 outline-none"
             />
-            {!isLogin && (
-              <p className="text-xs text-gray-500 mt-1">
-                Min. 8 caractères, 1 majuscule, 1 chiffre.
-              </p>
-            )}
           </div>
 
-          {/* CONFIRMATION MDP (Inscription seulement) */}
           {!isLogin && (
             <div>
               <label className="block text-sm font-medium text-gray-400 mb-1">Confirmer mot de passe</label>
@@ -210,10 +194,7 @@ export default function AuthPage() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
-                className={`w-full bg-slate-800 border rounded-lg p-3 text-white focus:outline-none transition ${
-                    confirmPassword && password !== confirmPassword ? "border-red-500" : "border-slate-700 focus:ring-purple-500"
-                }`}
-                placeholder="••••••••"
+                className={`w-full bg-slate-800 border rounded-lg p-3 text-white outline-none transition ${confirmPassword && password !== confirmPassword ? "border-red-500" : "border-slate-700 focus:ring-purple-500"}`}
               />
             </div>
           )}
@@ -221,7 +202,7 @@ export default function AuthPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-lg transition transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed mt-4"
+            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 rounded-lg transition transform active:scale-95 disabled:opacity-50 mt-4"
           >
             {loading ? "Chargement..." : (isLogin ? "Se connecter" : "S'inscrire")}
           </button>
@@ -230,12 +211,7 @@ export default function AuthPage() {
         <div className="mt-6 text-center text-sm text-gray-400">
           {isLogin ? "Pas encore de compte ?" : "Déjà un compte ?"}
           <button
-            onClick={() => {
-                setIsLogin(!isLogin);
-                setUsername("");
-                setConfirmPassword("");
-                setUsernameAvailable(null);
-            }}
+            onClick={() => setIsLogin(!isLogin)}
             className="ml-2 text-purple-400 hover:text-purple-300 font-bold underline"
           >
             {isLogin ? "Créer un compte" : "Se connecter"}
