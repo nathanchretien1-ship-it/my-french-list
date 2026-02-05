@@ -1,35 +1,23 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
+// next.config.ts
+import type { NextConfig } from "next";
+
+const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'hpqllfgdkwnuwodjgpoe.supabase.co', // Ton Supabase
+        hostname: 'lh3.googleusercontent.com', // Pour Google Auth
       },
       {
         protocol: 'https',
-        hostname: 'cdn.myanimelist.net', // <--- AJOUTE ÇA
+        hostname: 'cdn.myanimelist.net', // Pour Jikan API
       },
       {
         protocol: 'https',
-        hostname: 'images.unsplash.com', // Pour les bannières
-      },
-      { protocol: 'https',
-         hostname: 'bit.ly' 
-      },
-      {
-        protocol: 'https',
-        hostname: '**.googleusercontent.com', // Pour les avatars Google
-      },
+        hostname: '**.supabase.co', // Pour ton stockage Supabase
+      }
     ],
   },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  reactStrictMode: false,
 };
 
 export default nextConfig;

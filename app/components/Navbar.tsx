@@ -3,41 +3,34 @@ import Link from "next/link";
 import Image from "next/image";
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "../lib/supabase";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { toast } from "sonner";
 import SearchBar from "../components/SearchBar";
-import { usePathname } from "next/navigation"; // 👈 Ajoutez cet import
-import { User } from "@supabase/supabase-js"; // Ajoutez cet import pour le 
+import { User } from "@supabase/supabase-js";
 
 interface NavbarProps {
   user: User | null;
 }
 
 export default function Navbar({ user: initialUser }: NavbarProps) {
-  const [user, setUser] = useState<any>(initialUser);
+  // On utilise initialUser comme état initial, mais on garde la possibilité de le mettre à jour
+  const [user, setUser] = useState<User | null>(initialUser);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [pseudo, setPseudo] = useState<string>("");
   const [unreadCount, setUnreadCount] = useState<number>(0);
 
-
-  useEffect(() => {
-    setUser(initialUser);
-    if (!initialUser) {
-        // Si déconnecté, on vide tout
-        setAvatarUrl(null);
-        setPseudo("");
-        setUnreadCount(0);
-    } 
-    // Si connecté, le useEffect suivant lancera init() pour l'avatar
-  }, [initialUser]);
-  
+  // Client Supabase unique pour le composant client
   const [supabase] = useState(() => createClient());
   const router = useRouter();
-  const pathname = usePathname(); // 👈 Récupérez l'URL actuelle
+  const pathname = usePathname();
 
+  // Mise à jour de l'état local si la prop change (ex: après une server action)
+  useEffect(() => {
+    setUser(initialUser);
+  }, [initialUser]);
 
-  // Fonction pour compter les messages non lus
   const fetchUnreadCount = useCallback(async (userId: string) => {
+    if (!userId) return;
     try {
       const { count } = await supabase
         .from('messages')
@@ -46,128 +39,103 @@ export default function Navbar({ user: initialUser }: NavbarProps) {
         .eq('is_read', false);
       setUnreadCount(count || 0);
     } catch (err) {
-      console.error("Erreur lors de la récupération des messages:", err);
+      console.error("Erreur messages:", err);
     }
   }, [supabase]);
 
-  // Fonction d'initialisation des données utilisateur (Profil + Messages)
   const init = useCallback(async () => {
-    try {
-      const currentUser = user || initialUser;
+    const currentUser = user; // On utilise l'état courant
 
-      if (currentUser) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("username, avatar_url")
-          .eq("id", currentUser.id)
-          .single();
-
-        // 1. Gestion du Pseudo (Profil > Google > Email)
-        const username = profile?.username 
-          || currentUser.user_metadata?.full_name 
-          || currentUser.email?.split('@')[0] 
-          || "Mon Profil";
-        setPseudo(username);
-
-        // 2. Gestion de l'Avatar (Profil > Google > Rien)
-        if (profile?.avatar_url) {
-          // Cas A : L'utilisateur a uploadé sa propre image sur Supabase
-          const { data } = supabase.storage.from("avatars").getPublicUrl(profile.avatar_url);
-          setAvatarUrl(`${data.publicUrl}?t=${new Date().getTime()}`);
-        } else if (currentUser.user_metadata?.avatar_url || currentUser.user_metadata?.picture) {
-          // Cas B : Pas d'image perso, on prend celle de Google (avatar_url ou picture)
-          setAvatarUrl(currentUser.user_metadata.avatar_url || currentUser.user_metadata.picture);
-        } else {
-          // Cas C : Aucune image, on affichera l'initiale
-          setAvatarUrl(null);
-        }
-
-        await fetchUnreadCount(currentUser.id);
-      } else {
-        setUser(null);
+    if (!currentUser) {
         setAvatarUrl(null);
         setPseudo("");
         setUnreadCount(0);
+        return;
+    }
+
+    try {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("username, avatar_url")
+        .eq("id", currentUser.id)
+        .single();
+
+      // 1. Pseudo
+      const username = profile?.username 
+        || currentUser.user_metadata?.full_name 
+        || currentUser.email?.split('@')[0] 
+        || "Mon Profil";
+      setPseudo(username);
+
+      // 2. Avatar
+      if (profile?.avatar_url) {
+        const { data } = supabase.storage.from("avatars").getPublicUrl(profile.avatar_url);
+        setAvatarUrl(`${data.publicUrl}?t=${new Date().getTime()}`); // Cache busting
+      } else if (currentUser.user_metadata?.avatar_url || currentUser.user_metadata?.picture) {
+        setAvatarUrl(currentUser.user_metadata.avatar_url || currentUser.user_metadata.picture);
+      } else {
+        setAvatarUrl(null);
       }
+
+      await fetchUnreadCount(currentUser.id);
+
     } catch (error) {
       console.error("Erreur init navbar:", error);
     }
-  }, [supabase, fetchUnreadCount]);
+  }, [user, supabase, fetchUnreadCount]); // Dépend de `user`
 
+  // Effet principal : Initialisation + Auth Listener + Realtime
   useEffect(() => {
-    let channel: any;
+    // 1. Charger les infos initiales
+    init();
 
-    // Chargement initial au montage du composant
-    if (initialUser) {
-        // Optionnel : on peut optimiser en ne refetchant pas l'user tout de suite
-        // mais pour l'instant, appelons init() pour charger l'avatar et le pseudo
-        init(); 
-    } else {
-        init();
-    }
-    // Écouteur de changement d'état d'authentification
+    // 2. Écouter les changements d'auth (connexion/déconnexion dynamique)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (pathname === '/auth') return;
-
       if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
-        await init(); // On recharge toutes les infos
+        setUser(session?.user ?? null);
         router.refresh();
       }
       if (event === 'SIGNED_OUT') {
         setUser(null);
-        setAvatarUrl(null);
-        setPseudo("");
-        setUnreadCount(0);
         router.refresh();
       }
     });
 
-    // Configuration du temps réel pour les messages
-    const setupRealtime = async () => {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (authUser) {
+    // 3. Realtime Messages
+    let channel: any;
+    if (user) {
         channel = supabase
-          .channel('navbar_global_notifications')
+          .channel('navbar_notifications')
           .on(
             'postgres_changes',
             {
-              event: '*',
+              event: 'INSERT', // On écoute juste les inserts pour les notifs
               schema: 'public',
               table: 'messages',
-              filter: `receiver_id=eq.${authUser.id}`,
+              filter: `receiver_id=eq.${user.id}`,
             },
             (payload: any) => {
-              fetchUnreadCount(authUser.id);
-              if (payload.eventType === 'INSERT' && payload.new.sender_id !== authUser.id) {
-                toast.info("💬 Nouveau message reçu !");
+              fetchUnreadCount(user.id);
+              if (payload.new.sender_id !== user.id) {
+                toast.info("💬 Nouveau message !");
               }
             }
           )
           .subscribe();
-      }
-    };
-    setupRealtime();
+    }
 
     return () => {
       if (channel) supabase.removeChannel(channel);
       subscription.unsubscribe();
     };
-  }, [router, supabase, init, fetchUnreadCount]);
+  }, [user, supabase, router, init, fetchUnreadCount]);
 
   const handleLogout = async () => {
-    try {
-      // On appelle la route serveur pour nettoyer les cookies proprement
-      await fetch("/auth/signout", { method: "POST" });
-      
-      // On vide le state local immédiatement (optimiste)
-      setUser(null);
-      setAvatarUrl(null);
-      
-      toast.info("À bientôt !");
-      router.refresh(); // Rafraîchit la page pour que le layout sache qu'on est parti
-    } catch (err) {
-      console.error("Erreur déconnexion:", err);
-    }
+    await supabase.auth.signOut(); // Déconnexion côté client d'abord
+    await fetch("/auth/signout", { method: "POST" }); // Nettoyage cookies serveur
+    setUser(null);
+    toast.info("À bientôt !");
+    router.refresh();
   };
 
   return (
@@ -218,8 +186,7 @@ export default function Navbar({ user: initialUser }: NavbarProps) {
                         alt="Avatar" 
                         fill 
                         className="object-cover" 
-                        unoptimized 
-                        priority
+                        unoptimized // Important pour les images externes (Google) si non configurées dans next.config
                       />
                     ) : (
                       <div className="h-full w-full bg-purple-600 flex items-center justify-center text-xs font-bold text-white">
