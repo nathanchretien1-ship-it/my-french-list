@@ -3,17 +3,21 @@ import { NextResponse } from "next/server";
 // 👇 Important : importez bien votre fonction serveur
 import { createClient } from "@/app/lib/supabase/server"; 
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
   // Par défaut on redirige vers l'accueil, ou vers la page demandée
   const next = searchParams.get("next") ?? "/";
+  console.log("🔹 Callback OAuth déclenché. Code présent ?", !!code);
 
   if (code) {
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     
     if (!error) {
+      console.log("✅ Succès : Session créée et cookies définis.");
       const forwardedHost = request.headers.get('x-forwarded-host'); // Pour supporter les environnements déployés (Vercel)
       const isLocalEnv = process.env.NODE_ENV === 'development';
       
@@ -26,6 +30,9 @@ export async function GET(request: Request) {
       } else {
         return NextResponse.redirect(`${origin}${next}`);
       }
+    }else{
+      console.error("❌ Erreur échange code Supabase :", error.message);
+      return NextResponse.redirect(`${origin}/auth?error=${encodeURIComponent(error.message)}`);
     }
   }
 

@@ -31,8 +31,6 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  // 🛑 LIGNE CRUCIALE : Rafraîchit la session Auth
-  // Sans ça, le cookie de Google Login n'est pas persisté !
   await supabase.auth.getUser()
 
   return response
@@ -46,7 +44,8 @@ export const config = {
      * - _next/image (optimisation d'images)
      * - favicon.ico (icône)
      * - images (svg, png, etc.)
+     * - auth/callback (route d'authentification) 👈 AJOUT ICI
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|auth/callback|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }

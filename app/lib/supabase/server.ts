@@ -17,9 +17,10 @@ export async function createClient() {
             cookiesToSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, options)
             );
-          } catch {
+          } catch(error) {
             // Cette erreur est normale si on appelle cette fonction depuis un Server Component
             // (qui ne peut pas écrire de cookies), on l'ignore simplement.
+            console.error("ERREUR lors de l'écriture des cookies Supabase:", error);
           }
         },
       },
