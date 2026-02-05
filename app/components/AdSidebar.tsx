@@ -6,6 +6,7 @@ export default function AdSidebar({ side = "right" }: { side?: "left" | "right" 
   const [isHidden, setIsHidden] = useState(true);
   const supabase = createClient();
 
+  // 1. Logique Premium
   useEffect(() => {
     const checkPremium = async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -19,7 +20,7 @@ export default function AdSidebar({ side = "right" }: { side?: "left" | "right" 
     checkPremium();
   }, [supabase]);
 
-  // Initialisation de la pub une fois le composant monté
+  // 2. Initialisation de la pub spécifique
   useEffect(() => {
     if (!isHidden) {
       try {
@@ -29,23 +30,32 @@ export default function AdSidebar({ side = "right" }: { side?: "left" | "right" 
         console.error("AdSense error:", e);
       }
     }
-  }, [isHidden]);
+  }, [isHidden, side]); // On relance si le côté change
 
   if (isHidden) return null;
 
+  // 3. Choix du Slot ID selon le côté
+  const adSlot = side === "left" ? "7507047080" : "2250124623";
+
   return (
-    <aside className={`hidden ${side === 'left' ? '2xl:block' : 'xl:block'} w-[240px] flex-shrink-0 space-y-4 sticky top-24`}>
-      <div className="text-center text-[10px] text-gray-400 uppercase mb-2">Publicité</div>
-      
-      {/* Conteneur AdSense */}
-      <div className="overflow-hidden flex justify-center bg-gray-50/5 rounded-lg border border-white/5">
-        <ins className="adsbygoogle"
-             style={{ display: 'block', width: '240px', height: '600px' }}
-             data-ad-client="ca-pub-XXXXXXXXXXXXXXXX" // 👈 TON ID ICI
-             data-ad-slot="XXXXXXXXXX"               // 👈 TON ID DE BLOC ICI
-             data-ad-format="vertical"
-             data-full-width-responsive="false">
-        </ins>
+    <aside 
+      key={side} // Important pour différencier les deux instances
+      className={`hidden ${side === 'left' ? '2xl:block' : 'xl:block'} w-[240px] flex-shrink-0 sticky top-24`}
+    >
+      <div className="bg-white/5 rounded-lg overflow-hidden border border-white/10">
+        <div className="bg-gray-100/5 px-2 py-1 text-[9px] text-gray-500 font-bold uppercase tracking-widest text-center border-b border-white/10">
+          Publicité {side === "left" ? "1" : "2"}
+        </div>
+        
+        <div className="p-2 min-h-[600px] flex items-center justify-center">
+          <ins className="adsbygoogle"
+               style={{ display: 'block', minWidth: '200px' }}
+               data-ad-client="ca-pub-8276754611976179"
+               data-ad-slot={adSlot}
+               data-ad-format="auto"
+               data-full-width-responsive="true">
+          </ins>
+        </div>
       </div>
     </aside>
   );

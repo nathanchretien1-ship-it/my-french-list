@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import Navbar from "./components/Navbar";
 import { Toaster } from "sonner"; // 👈 IMPORT
+import Script from "next/script";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -19,6 +20,12 @@ export default function RootLayout({
   return (
     <html lang="fr">
       <head>
+        <Script
+    async
+    src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8276754611976179"
+    crossOrigin="anonymous"
+    strategy="afterInteractive"
+  />
         <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8276754611976179"
       crossOrigin="anonymous"></script>
       </head>
