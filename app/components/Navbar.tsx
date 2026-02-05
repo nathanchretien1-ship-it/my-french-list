@@ -133,7 +133,6 @@ export default function Navbar() {
       await supabase.auth.signOut();
       toast.info("À bientôt !");
       router.push("/"); 
-      router.refresh();
     } catch (err) {
       console.error("Erreur déconnexion:", err);
     }
