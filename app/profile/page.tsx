@@ -72,10 +72,13 @@ export default function ProfilePage() {
   async function getProfile() {
     try {
       setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-
+      const { data: { user },error } = await supabase.auth.getUser();
+     if (error) {
+         console.error("❌ Erreur Auth Profil:", error);
+     }
       if (!user) {
-        router.push("/auth");
+        console.warn("⚠️ Aucun utilisateur trouvé sur la page Profil (Redirection bloquée pour debug)");
+        //router.push("/auth");
         return;
       }
       setUser(user);
