@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { createClient } from "../lib/supabase";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -16,61 +16,71 @@ export default function Navbar() {
   const supabase = createClient();
   const router = useRouter();
 
-  // Fonction pour compter les messages (extraite pour être réutilisée)
-  const fetchUnreadCount = async (userId: string) => {
-    const { count } = await supabase
-      .from('messages')
-      .select('*', { count: 'exact', head: true })
-      .eq('receiver_id', userId)
-      .eq('is_read', false);
-    setUnreadCount(count || 0);
-  };
-
-  // 1. Fonction d'initialisation des données utilisateur
-  const init = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    setUser(user);
-
-    if (user) {
-      // Profil
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("username, avatar_url")
-        .eq("id", user.id)
-        .single();
-
-      if (profile) {
-        setPseudo(profile.username || user.email?.split('@')[0] || "Mon Profil");
-        if (profile.avatar_url) {
-          const { data } = supabase.storage.from("avatars").getPublicUrl(profile.avatar_url);
-          setAvatarUrl(`${data.publicUrl}?t=${new Date().getTime()}`);
-        }
-      } else {
-        // Fallback si le profil n'existe pas encore
-        setPseudo(user.email?.split('@')[0] || "Mon Profil");
-        setAvatarUrl(null);
-      }
-
-      // Compteur initial
-      await fetchUnreadCount(user.id);
-    } else {
-      // Reset si pas d'utilisateur
-      setUser(null);
-      setAvatarUrl(null);
-      setPseudo("");
-      setUnreadCount(0);
+  // Fonction pour compter les messages non lus
+  const fetchUnreadCount = useCallback(async (userId: string) => {
+    try {
+      const { count } = await supabase
+        .from('messages')
+        .select('*', { count: 'exact', head: true })
+        .eq('receiver_id', userId)
+        .eq('is_read', false);
+      setUnreadCount(count || 0);
+    } catch (err) {
+      console.error("Erreur lors de la récupération des messages:", err);
     }
-  };
+  }, [supabase]);
+
+  // Fonction d'initialisation des données utilisateur (Profil + Messages)
+  const init = useCallback(async () => {
+    try {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      setUser(currentUser);
+
+      if (currentUser) {
+        // 1. Récupération du profil
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("username, avatar_url")
+          .eq("id", currentUser.id)
+          .single();
+
+        if (profile) {
+          setPseudo(profile.username || currentUser.email?.split('@')[0] || "Mon Profil");
+          if (profile.avatar_url) {
+            const { data } = supabase.storage.from("avatars").getPublicUrl(profile.avatar_url);
+            // Ajout d'un timestamp pour éviter le cache navigateur sur l'image
+            setAvatarUrl(`${data.publicUrl}?t=${new Date().getTime()}`);
+          } else {
+            setAvatarUrl(null);
+          }
+        } else {
+          setPseudo(currentUser.email?.split('@')[0] || "Mon Profil");
+        }
+
+        // 2. Récupération des messages
+        await fetchUnreadCount(currentUser.id);
+      } else {
+        // Reset des états si déconnecté
+        setUser(null);
+        setAvatarUrl(null);
+        setPseudo("");
+        setUnreadCount(0);
+      }
+    } catch (error) {
+      console.error("Erreur lors de l'initialisation de la Navbar:", error);
+    }
+  }, [supabase, fetchUnreadCount]);
 
   useEffect(() => {
     let channel: any;
 
-    init(); // Chargement initial
+    // Chargement initial au montage du composant
+    init();
 
-    // 2. ÉCOUTEUR DE CHANGEMENT D'AUTH (CORRECTION ICI)
+    // Écouteur de changement d'état d'authentification
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
-        await init(); // On relance l'initialisation complète
+        await init(); // On recharge toutes les infos
         router.refresh();
       }
       if (event === 'SIGNED_OUT') {
@@ -82,11 +92,10 @@ export default function Navbar() {
       }
     });
 
-    // 3. Temps Réel pour les messages (déplacé dans un effet séparé ou géré ici)
-    // On ne l'active que si on a un user
+    // Configuration du temps réel pour les messages
     const setupRealtime = async () => {
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      if (currentUser) {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (authUser) {
         channel = supabase
           .channel('navbar_global_notifications')
           .on(
@@ -95,11 +104,11 @@ export default function Navbar() {
               event: '*',
               schema: 'public',
               table: 'messages',
-              filter: `receiver_id=eq.${currentUser.id}`,
+              filter: `receiver_id=eq.${authUser.id}`,
             },
             (payload: any) => {
-              fetchUnreadCount(currentUser.id);
-              if (payload.eventType === 'INSERT' && payload.new.sender_id !== currentUser.id) {
+              fetchUnreadCount(authUser.id);
+              if (payload.eventType === 'INSERT' && payload.new.sender_id !== authUser.id) {
                 toast.info("💬 Nouveau message reçu !");
               }
             }
@@ -113,12 +122,17 @@ export default function Navbar() {
       if (channel) supabase.removeChannel(channel);
       subscription.unsubscribe();
     };
-  }, [router, supabase]);
+  }, [router, supabase, init, fetchUnreadCount]);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    toast.info("À bientôt !");
-    router.push("/"); 
+    try {
+      await supabase.auth.signOut();
+      toast.info("À bientôt !");
+      router.push("/"); 
+      router.refresh();
+    } catch (err) {
+      console.error("Erreur déconnexion:", err);
+    }
   };
 
   return (
@@ -164,7 +178,14 @@ export default function Navbar() {
                 <Link href="/profile" className="flex items-center gap-3 hover:bg-white/5 pr-4 pl-2 py-1 rounded-full transition group">
                   <div className="relative h-8 w-8 rounded-full overflow-hidden border border-gray-500 group-hover:border-purple-400 transition">
                     {avatarUrl ? (
-                      <Image src={avatarUrl} alt="Avatar" fill className="object-cover" unoptimized priority/>
+                      <Image 
+                        src={avatarUrl} 
+                        alt="Avatar" 
+                        fill 
+                        className="object-cover" 
+                        unoptimized 
+                        priority
+                      />
                     ) : (
                       <div className="h-full w-full bg-purple-600 flex items-center justify-center text-xs font-bold text-white">
                         {pseudo.charAt(0).toUpperCase()}
@@ -175,7 +196,11 @@ export default function Navbar() {
                     {pseudo}
                   </span>
                 </Link>
-                <button onClick={handleLogout} className="text-gray-400 hover:text-red-400 p-2 rounded-full transition">
+                <button 
+                  onClick={handleLogout} 
+                  className="text-gray-400 hover:text-red-400 p-2 rounded-full transition"
+                  title="Déconnexion"
+                >
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75" />
                   </svg>
