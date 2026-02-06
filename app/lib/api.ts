@@ -2,7 +2,6 @@ import { translate } from 'google-translate-api-x';
 
 const BASE_URL = "https://api.jikan.moe/v4";
 
-// Fonction utilitaire pour attendre (Déclarée une seule fois ici)
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 function translateStatus(status: string): string {
@@ -20,7 +19,7 @@ function translateStatus(status: string): string {
 }
 
 async function fetchWithCache(endpoint: string, revalidateTime: number) {
-  // On utilise la fonction delay définie plus haut
+  // Délai de courtoisie pour l'API Jikan
   await delay(250);
 
   try {
@@ -56,18 +55,16 @@ async function fetchWithCache(endpoint: string, revalidateTime: number) {
 
 // --- LES FONCTIONS EXPORTÉES ---
 
-export async function getTopAnime(page = 1, filter: 'airing' | 'favorite' | 'bypopularity' = 'bypopularity') {
+// Correction ici : On simplifie les filtres pour coller à l'API Jikan V4
+export async function getTopAnime(page = 1, filter: 'airing' | 'score' = 'airing') {
   let queryParams = `page=${page}&limit=24&sfw=true`;
 
   if (filter === 'airing') {
-      // "Meilleurs du moment" -> Top Airing
+      // "Tendances du moment" (Top Airing)
       queryParams += '&filter=airing';
-  } else if (filter === 'favorite') {
-      // "Meilleure note" -> Trié par score
-      queryParams += '&order_by=score&sort=desc';
   } else {
-      // "Populaire" (Défaut) -> Trié par nombre de membres
-      queryParams += '&order_by=members&sort=desc';
+      // "Légendes" (Top par Score - comportement par défaut de /top/anime)
+      // On n'ajoute rien, car /top/anime est déjà trié par rang/score
   }
 
   const data = await fetchWithCache(`/top/anime?${queryParams}`, 3600);
