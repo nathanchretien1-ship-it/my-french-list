@@ -4,7 +4,14 @@ import { createClient } from "../lib/supabase";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-export default function AddToListButton({ anime, mediaType = "anime" }: { anime: any, mediaType?: "anime" | "manga" }) {
+// On ajoute userId dans les props pour éviter de le refetcher 50 fois sur la page d'accueil
+interface AddButtonProps {
+    anime: any;
+    mediaType?: "anime" | "manga";
+    userId?: string;
+}
+
+export default function AddToListButton({ anime, mediaType = "anime", userId }: AddButtonProps) {
   const [loading, setLoading] = useState(true);
   const [isAdded, setIsAdded] = useState(false);
   
@@ -13,42 +20,58 @@ export default function AddToListButton({ anime, mediaType = "anime" }: { anime:
 
   useEffect(() => {
     const checkStatus = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setLoading(false); return; }
+      // Si on a déjà l'ID via les props (depuis Home), on l'utilise directement
+      let currentUserId = userId;
 
-      // 👇 CORRECTION : On lit dans 'library' avec les bonnes colonnes
+      // Sinon, on le cherche (cas de la page détail)
+      if (!currentUserId) {
+          const { data: { user } } = await supabase.auth.getUser();
+          currentUserId = user?.id;
+      }
+      
+      if (!currentUserId) { setLoading(false); return; }
+
       const { data } = await supabase
         .from("library")
         .select("id")
-        .eq("user_id", user.id)
-        .eq("jikan_id", anime.mal_id) // On map mal_id vers jikan_id
-        .eq("type", mediaType)        // On map mediaType vers type
-        .maybeSingle(); // Utilise maybeSingle pour éviter les erreurs 406
+        .eq("user_id", currentUserId)
+        .eq("jikan_id", anime.mal_id)
+        .eq("type", mediaType)
+        .maybeSingle();
 
       if (data) setIsAdded(true);
       setLoading(false);
     };
     checkStatus();
-  }, [anime.mal_id, mediaType, supabase]);
+  }, [anime.mal_id, mediaType, supabase, userId]);
 
-  const handleToggle = async () => {
+  const handleToggle = async (e: React.MouseEvent) => {
+    e.preventDefault(); // Empêche le clic de déclencher le lien de la carte parente
+    e.stopPropagation();
+
     setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
+    
+    // Récupération de l'user (prop ou fetch)
+    let currentUserId = userId;
+    if (!currentUserId) {
+        const { data: { user } } = await supabase.auth.getUser();
+        currentUserId = user?.id;
+    }
 
-    if (!user) {
-      toast.error("Connecte-toi pour créer ta liste !", {
-          action: { label: "Se connecter", onClick: () => router.push("/auth") }
+    if (!currentUserId) {
+      toast.error("Connecte-toi pour gérer ta liste !", {
+          action: { label: "Connexion", onClick: () => router.push("/auth") }
       });
       setLoading(false);
       return;
     }
 
     if (isAdded) {
-      // SUPPRESSION (Table library)
+      // SUPPRESSION
       const { error } = await supabase
         .from("library")
         .delete()
-        .eq("user_id", user.id)
+        .eq("user_id", currentUserId)
         .eq("jikan_id", anime.mal_id)
         .eq("type", mediaType);
 
@@ -56,54 +79,52 @@ export default function AddToListButton({ anime, mediaType = "anime" }: { anime:
         setIsAdded(false);
         toast.info("Retiré de ta bibliothèque");
       } else {
-        toast.error("Erreur lors de la suppression");
+        toast.error("Erreur suppression");
       }
     } else {
-      // AJOUT (Table library)
-      // On sécurise l'image car Jikan change parfois de structure
+      // AJOUT
       const imageUrl = anime.images?.jpg?.large_image_url || anime.images?.jpg?.image_url;
 
       const { error } = await supabase.from("library").upsert({
-        user_id: user.id,
-        jikan_id: anime.mal_id, // Important : nom de colonne SQL
+        user_id: currentUserId,
+        jikan_id: anime.mal_id,
         title: anime.title,
         image_url: imageUrl,
         status: "plan_to_watch",
         score: 0,
-        type: mediaType // Important : nom de colonne SQL
+        type: mediaType
       }, 
-      // La contrainte d'unicité définie dans le SQL précédent
       { onConflict: 'user_id, jikan_id, type' }); 
 
       if (!error) {
         setIsAdded(true);
-        toast.success(`Ajouté à ta collection ${mediaType} !`);
+        toast.success(`Ajouté à ta liste !`);
       } else {
-        console.error(error);
-        toast.error("Erreur lors de l'ajout");
+        toast.error("Erreur ajout");
       }
     }
     setLoading(false);
     router.refresh();
   };
 
-  if (loading) return <button className="mt-4 w-full bg-gray-800 p-3 rounded-lg animate-pulse">...</button>;
-
+  // Version "Mini" pour les cartes (juste l'icône)
   return (
     <button
       onClick={handleToggle}
-      className={`mt-4 w-full font-bold py-3 px-4 rounded-lg flex items-center justify-center gap-2 transform active:scale-95 transition ${
-        isAdded ? "bg-red-500/10 text-red-400 border border-red-500/50" : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg"
-      }`}
+      disabled={loading}
+      className={`shadow-xl rounded-full w-10 h-10 flex items-center justify-center transition-all duration-200 ${
+        isAdded 
+            ? "bg-red-500 hover:bg-red-600 text-white" 
+            : "bg-indigo-600 hover:bg-indigo-700 text-white"
+      } ${loading ? "opacity-50 cursor-wait" : "hover:scale-110"}`}
+      title={isAdded ? "Retirer" : "Ajouter"}
     >
-      {isAdded ? (
-        <>
-            <span>🗑️</span> Retirer de ma liste
-        </>
+      {loading ? (
+          <span className="animate-spin text-xs">⌛</span>
+      ) : isAdded ? (
+          <span>🗑️</span> 
       ) : (
-        <>
-            <span>➕</span> Ajouter à ma liste
-        </>
+          <span>➕</span>
       )}
     </button>
   );

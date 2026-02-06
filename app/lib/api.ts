@@ -56,8 +56,17 @@ async function fetchWithCache(endpoint: string, revalidateTime: number) {
 
 // --- LES FONCTIONS EXPORTÉES ---
 
-export async function getTopAnime() {
-  const data = await fetchWithCache("/top/anime?filter=bypopularity", 3600);
+export async function getTopAnime(page = 1, filter: 'bypopularity' | 'favorite' | 'airing' = 'bypopularity') {
+  let queryParams = `page=${page}&limit=24&sfw=true`;
+  if (filter === 'favorite') {
+      queryParams += '&order_by=score&sort=desc';
+  } else if (filter === 'bypopularity') {
+      queryParams += '&order_by=members&sort=desc';
+  } else if (filter === 'airing') {
+      queryParams += '&filter=airing';
+  }
+
+  const data = await fetchWithCache(`/top/anime?${queryParams}`, 3600);
   return data || [];
 }
 
