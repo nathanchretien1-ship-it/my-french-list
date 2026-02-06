@@ -4,20 +4,19 @@ const BASE_URL = "https://api.jikan.moe/v4";
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// ✅ On exporte cette fonction pour pouvoir l'utiliser ailleurs si besoin
+// ✅ Traduction plus robuste (insensible à la casse)
 export function translateStatus(status: string): string {
   if (!status) return "Inconnu";
-  switch (status) {
-    case "Finished Airing": return "Terminé";
-    case "Currently Airing": return "En cours";
-    case "Not yet aired": return "À venir";
-    case "Finished": return "Terminé";
-    case "Publishing": return "En cours";
-    case "On Hiatus": return "En pause";
-    case "Discontinued": return "Abandonné";
-    case "Not yet published": return "À venir";
-    default: return status;
-  }
+  const s = status.toLowerCase().trim();
+  
+  if (s === "finished airing" || s === "finished") return "Terminé";
+  if (s === "currently airing") return "En cours"; // Anime
+  if (s === "publishing" || s === "currently publishing") return "En cours"; // Manga
+  if (s === "not yet aired" || s === "not yet published") return "À venir";
+  if (s === "on hiatus") return "En pause";
+  if (s === "discontinued") return "Abandonné";
+  
+  return status; // Retourne l'original si pas de match
 }
 
 async function fetchWithCache(endpoint: string, revalidateTime: number) {
@@ -40,14 +39,25 @@ async function fetchWithCache(endpoint: string, revalidateTime: number) {
   } catch (error) { return null; }
 }
 
-export async function getTopAnime(page = 1, filter: 'airing' | 'score' = 'airing') {
+// ✅ Fonction générique pour récupérer Top Anime OU Manga avec filtres
+export async function getTopContent(type: 'anime' | 'manga', page = 1, filter: 'airing' | 'score' | 'bypopularity' = 'bypopularity') {
   let queryParams = `page=${page}&limit=24&sfw=true`;
-  if (filter === 'airing') queryParams += '&filter=airing';
-  else queryParams += '&order_by=score&sort=desc';
 
-  const data = await fetchWithCache(`/top/anime?${queryParams}`, 3600);
+  if (filter === 'airing') {
+      // "Tendances"
+      if (type === 'anime') queryParams += '&filter=airing';
+      else queryParams += '&filter=publishing'; // Pour les mangas, c'est 'publishing'
+  } else if (filter === 'score') {
+      // "Légendes"
+      queryParams += '&order_by=score&sort=desc';
+  } else {
+      // "Populaire" (Défaut)
+      queryParams += '&order_by=members&sort=desc';
+  }
+
+  const endpoint = type === 'anime' ? '/top/anime' : '/top/manga';
+  const data = await fetchWithCache(`${endpoint}?${queryParams}`, 3600);
   
-  // ✅ On traduit le statut pour chaque élément de la liste
   if (data) {
       return data.map((item: any) => ({
           ...item,
@@ -57,44 +67,32 @@ export async function getTopAnime(page = 1, filter: 'airing' | 'score' = 'airing
   return [];
 }
 
+// --- Wrappers pour compatibilité existante ---
+export async function getTopAnime(page = 1, filter: 'airing' | 'score' | 'bypopularity' = 'bypopularity') {
+    return getTopContent('anime', page, filter);
+}
+
+export async function getTopManga(page = 1, filter: 'airing' | 'score' | 'bypopularity' = 'bypopularity') {
+    return getTopContent('manga', page, filter);
+}
+
 export async function getAnimeById(id: string) {
   const data = await fetchWithCache(`/anime/${id}/full`, 86400);
   if (!data) return null;
-
-  if (data.synopsis) {
-    try {
-      const res = await translate(data.synopsis, { to: 'fr' }) as any;
-      data.synopsis = res.text;
-    } catch (e) { }
-  }
-  
-  // ✅ Traduction du statut
+  if (data.synopsis) { try { const res = await translate(data.synopsis, { to: 'fr' }) as any; data.synopsis = res.text; } catch (e) { } }
   data.status = translateStatus(data.status);
   return data;
-}export async function getMangaById(id: string) {
+}
+
+export async function getMangaById(id: string) {
   const data = await fetchWithCache(`/manga/${id}/full`, 86400);
   if (!data) return null;
-
-  if (data.synopsis) {
-    try {
-      const res = await translate(data.synopsis, { to: 'fr' }) as any;
-      data.synopsis = res.text;
-    } catch (e) { }
-  }
-  
-  // ✅ Traduction du statut
+  if (data.synopsis) { try { const res = await translate(data.synopsis, { to: 'fr' }) as any; data.synopsis = res.text; } catch (e) { } }
   data.status = translateStatus(data.status);
   return data;
 }
 
-// ... Les autres fonctions (getTopManga, etc.) restent inchangées ou tu peux aussi y appliquer le map()
-export async function getTopManga() {
-    const data = await fetchWithCache("/top/manga?filter=bypopularity", 3600);
-    if (data) return data.map((item: any) => ({ ...item, status: translateStatus(item.status) }));
-    return [];
-}
-
-// ... Garde le reste du fichier (searchAnime, getSeasonNow...) tel quel
+// ... (Garde searchAnime, getSeasonNow, etc. comme avant)
 export async function searchAnime(query: string) {
   const data = await fetchWithCache(`/anime?q=${encodeURIComponent(query)}&sfw=true&limit=10`, 300);
   return data || [];

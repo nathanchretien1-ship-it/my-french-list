@@ -7,16 +7,16 @@ import Link from "next/link";
 import { toast } from "sonner";
 import UserBadge from "../components/UserBadge";
 
-// --- CONFIG ---
-const ENABLE_GACHA = false; // Mettre à true si tu réactives le Gacha
+// --- 🚧 CONFIG 🚧 ---
+const ENABLE_GACHA = false; 
 
-// Styles de bannières par défaut
 const DEFAULT_BANNERS = [
   { id: 'basic_1', name: 'Bleu Nuit', url: 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800&q=80', isPremium: false },
   { id: 'basic_2', name: 'Forêt Sombre', url: 'https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?w=800&q=80', isPremium: false },
   { id: 'basic_3', name: 'Gris Minimal', url: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?w=800&q=80', isPremium: false },
   { id: 'prem_1', name: 'Cyber City', url: 'https://images.unsplash.com/photo-1535295972055-1c762f4483e5?w=800&q=80', isPremium: true },
   { id: 'prem_2', name: 'Neon Vibes', url: 'https://images.unsplash.com/photo-1563089145-599997674d42?w=800&q=80', isPremium: true },
+  { id: 'prem_3', name: 'Galaxy', url: 'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?w=800&q=80', isPremium: true },
 ];
 
 const PRESET_STATUSES = [
@@ -36,7 +36,7 @@ export default function ProfilePage() {
   const [uploading, setUploading] = useState(false);
   const [user, setUser] = useState<any>(null);
 
-  // Données Profil
+  // Profil
   const [username, setUsername] = useState("");
   const [originalUsername, setOriginalUsername] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -202,12 +202,12 @@ export default function ProfilePage() {
 
   // --- LOGIQUE DE FILTRAGE ---
   const filteredLibrary = library.filter(item => {
-      // 1. Filtre TYPE
+      // 1. Filtre TYPE (Anime ou Manga)
       const itemType = item.type?.toLowerCase() || 'anime';
       if (typeFilter === 'anime' && (itemType === 'manga' || itemType === 'novel')) return false;
       if (typeFilter === 'manga' && itemType !== 'manga' && itemType !== 'novel') return false;
 
-      // 2. Filtre STATUT
+      // 2. Filtre STATUT (À voir ou Terminé)
       if (statusFilter === 'plan_to_watch' && item.status !== 'plan_to_watch') return false;
       if (statusFilter === 'completed' && item.status !== 'completed') return false;
 
@@ -305,7 +305,7 @@ export default function ProfilePage() {
                             {/* Filtre STATUT */}
                             <div className="flex bg-slate-900 p-1 rounded-lg border border-white/10">
                                 <button onClick={() => setStatusFilter('all')} className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase transition ${statusFilter === 'all' ? 'bg-slate-600 text-white' : 'text-gray-400 hover:text-white'}`}>Tout</button>
-                                <button onClick={() => setStatusFilter('plan_to_watch')} className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase transition ${statusFilter === 'plan_to_watch' ? 'bg-indigo-500 text-white' : 'text-gray-400 hover:text-white'}`}>À voir</button>
+                                <button onClick={() => setStatusFilter('plan_to_watch')} className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase transition ${statusFilter === 'plan_to_watch' ? 'bg-indigo-500 text-white' : 'text-gray-400 hover:text-white'}`}>À voir/lire</button>
                                 <button onClick={() => setStatusFilter('completed')} className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase transition ${statusFilter === 'completed' ? 'bg-green-600 text-white' : 'text-gray-400 hover:text-white'}`}>Terminé</button>
                             </div>
                         </div>
@@ -317,8 +317,42 @@ export default function ProfilePage() {
                                 const isManga = item.type?.toLowerCase() === 'manga' || item.type?.toLowerCase() === 'novel';
                                 const targetLink = isManga ? `/manga/${item.jikan_id}` : `/anime/${item.jikan_id}`;
                                 const icon = isManga ? '📖' : '📺';
-                                const statusBadge = item.status === 'completed' ? '✓ Terminé' : '⏰ À voir';
-                                const statusColor = item.status === 'completed' ? 'bg-green-600' : 'bg-indigo-600';
+                                
+                                // Adaptation du texte selon le type
+                                let statusBadge = 'Inconnu';
+                                let statusColor = 'bg-gray-600';
+
+                                if (item.status === 'completed') {
+                                    statusBadge = '✓ Terminé';
+                                    statusColor = 'bg-green-600';
+                                } else if (item.status === 'plan_to_watch') {
+                                    statusBadge = isManga ? '⏰ À lire' : '⏰ À voir';
+                                    statusColor = 'bg-indigo-600';
+                                }
+
+                                // Fonction de suppression rapide
+                                const handleDelete = async (e: React.MouseEvent) => {
+                                    e.preventDefault(); 
+                                    e.stopPropagation();
+                                    if(!confirm("Retirer de la bibliothèque ?")) return;
+
+                                    try {
+                                        // On utilise 'id' (clé primaire de la table library)
+                                        const { error } = await supabase
+                                            .from('library')
+                                            .delete()
+                                            .eq('id', item.id);
+                                        
+                                        if (error) throw error;
+                                        toast.success("Supprimé !");
+                                        
+                                        // Mise à jour optimiste
+                                        setLibrary(prev => prev.filter(l => l.id !== item.id));
+                                        setAnimeCount(prev => prev - 1);
+                                    } catch (err) {
+                                        toast.error("Erreur suppression");
+                                    }
+                                };
 
                                 return (
                                     <Link href={targetLink} key={`${item.jikan_id}-${item.type}`} className="group relative aspect-[2/3] rounded-lg overflow-hidden border border-white/10 hover:border-white/30 transition shadow-lg bg-slate-900 block">
@@ -328,6 +362,15 @@ export default function ProfilePage() {
                                             <div className="w-full h-full bg-slate-800 flex items-center justify-center text-xs text-gray-500">Pas d'image</div>
                                         )}
                                         
+                                        {/* BOUTON SUPPRESSION RAPIDE (Apparaît au survol) */}
+                                        <button 
+                                            onClick={handleDelete}
+                                            className="absolute top-2 left-2 z-20 w-8 h-8 rounded-full bg-black/60 hover:bg-red-600 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 border border-white/20 backdrop-blur"
+                                            title="Retirer de la liste"
+                                        >
+                                            🗑️
+                                        </button>
+
                                         {/* Badge Statut */}
                                         <div className={`absolute top-2 right-2 px-2 py-0.5 rounded text-[8px] font-bold text-white shadow-md ${statusColor}`}>
                                             {statusBadge}

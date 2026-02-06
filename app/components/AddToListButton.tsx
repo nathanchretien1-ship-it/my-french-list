@@ -8,7 +8,7 @@ interface AddButtonProps {
     anime: any;
     mediaType?: "anime" | "manga";
     userId?: string;
-    compact?: boolean; // Option pour affichage compact (sur les cartes) vs complet (sur la page détail)
+    compact?: boolean; 
 }
 
 type ListStatus = "plan_to_watch" | "completed" | null;
@@ -19,6 +19,11 @@ export default function AddToListButton({ anime, mediaType = "anime", userId, co
   
   const supabase = createClient();
   const router = useRouter();
+
+  // Textes dynamiques
+  const textPlan = mediaType === 'manga' ? "À lire plus tard" : "À regarder plus tard";
+  const textCompleted = mediaType === 'manga' ? "Déjà lu" : "Déjà vu";
+  const textMarkCompleted = mediaType === 'manga' ? "Marquer comme lu" : "Marquer comme vu";
 
   useEffect(() => {
     const checkStatus = async () => {
@@ -73,14 +78,14 @@ export default function AddToListButton({ anime, mediaType = "anime", userId, co
         jikan_id: anime.mal_id,
         title: anime.title,
         image_url: imageUrl,
-        status: newStatus, // 'plan_to_watch' ou 'completed'
+        status: newStatus, 
         score: 0,
         type: mediaType
       }, { onConflict: 'user_id, jikan_id, type' });
 
       if (!error) {
         setStatus(newStatus);
-        toast.success(newStatus === 'plan_to_watch' ? "Ajouté à 'À voir plus tard'" : "Marqué comme 'Terminé' !");
+        toast.success(newStatus === 'plan_to_watch' ? `Ajouté à '${textPlan}'` : `Marqué comme '${textCompleted}' !`);
       } else {
         toast.error("Erreur...");
       }
@@ -89,19 +94,18 @@ export default function AddToListButton({ anime, mediaType = "anime", userId, co
     router.refresh();
   };
 
-  // --- RENDU COMPACT (Pour les cartes) ---
-  // Affiche juste un "+" ou l'icône du statut actuel
+  // --- RENDU COMPACT (Sur les cartes) ---
   if (compact) {
       return (
         <button
-          onClick={(e) => handleUpdate(e, status ? null : 'plan_to_watch')} // Par défaut, compact ajoute en "À voir"
+          onClick={(e) => handleUpdate(e, status ? null : 'plan_to_watch')} 
           disabled={loading}
           className={`shadow-xl rounded-full w-10 h-10 flex items-center justify-center transition-all duration-200 ${
             status === 'completed' ? "bg-green-600 text-white" :
             status === 'plan_to_watch' ? "bg-indigo-600 text-white" :
             "bg-white text-black hover:bg-gray-200"
           } ${loading ? "opacity-50" : "hover:scale-110"}`}
-          title={status ? "Retirer" : "À regarder plus tard"}
+          title={status ? "Retirer" : textPlan}
         >
           {loading ? <span className="animate-spin text-xs">⌛</span> : 
            status === 'completed' ? <span>✓</span> :
@@ -111,10 +115,9 @@ export default function AddToListButton({ anime, mediaType = "anime", userId, co
       );
   }
 
-  // --- RENDU COMPLET (Pour la page détail) ---
+  // --- RENDU COMPLET (Page détail) ---
   return (
     <div className="flex flex-col gap-2 w-full">
-        {/* Bouton "À voir plus tard" */}
         <button
             onClick={(e) => handleUpdate(e, status === 'plan_to_watch' ? null : 'plan_to_watch')}
             className={`w-full py-3 px-4 rounded-lg flex items-center justify-center gap-2 font-bold transition border ${
@@ -123,10 +126,9 @@ export default function AddToListButton({ anime, mediaType = "anime", userId, co
                 : "bg-indigo-900/30 border-indigo-500/30 text-indigo-200 hover:bg-indigo-900/50 hover:border-indigo-400"
             }`}
         >
-            <span>{status === 'plan_to_watch' ? "Retirer de 'À voir'" : "⏰ À regarder plus tard"}</span>
+            <span>{status === 'plan_to_watch' ? "Retirer de 'À voir'" : `⏰ ${textPlan}`}</span>
         </button>
 
-        {/* Bouton "Terminé" */}
         <button
             onClick={(e) => handleUpdate(e, status === 'completed' ? null : 'completed')}
             className={`w-full py-2 px-4 rounded-lg flex items-center justify-center gap-2 font-bold text-sm transition border ${
@@ -135,7 +137,7 @@ export default function AddToListButton({ anime, mediaType = "anime", userId, co
                 : "bg-green-900/30 border-green-500/30 text-green-200 hover:bg-green-900/50 hover:border-green-400"
             }`}
         >
-            <span>{status === 'completed' ? "✓ Déjà vu (Retirer)" : "✓ Marquer comme vu"}</span>
+            <span>{status === 'completed' ? `✓ ${textCompleted} (Retirer)` : `✓ ${textMarkCompleted}`}</span>
         </button>
     </div>
   );

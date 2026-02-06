@@ -1,6 +1,6 @@
 'use server'
-import { getTopAnime } from "./lib/api";
+import { getTopContent } from "./lib/api";
 
-export async function fetchAnimeList(page: number, filter: 'airing' | 'score') {
-    return await getTopAnime(page, filter);
+export async function fetchMediaList(type: 'anime' | 'manga', page: number, filter: 'airing' | 'score' | 'bypopularity') {
+    return await getTopContent(type, page, filter);
 }
