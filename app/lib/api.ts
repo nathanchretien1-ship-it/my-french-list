@@ -2,34 +2,30 @@ import { translate } from 'google-translate-api-x';
 
 const BASE_URL = "https://api.jikan.moe/v4";
 
-// Fonction utilitaire pour attendre (une seule déclaration)
+// Fonction utilitaire pour attendre (Déclarée une seule fois ici)
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 function translateStatus(status: string): string {
   switch (status) {
-    // --- STATUS ANIME ---
     case "Finished Airing": return "Terminé";
     case "Currently Airing": return "En cours de diffusion";
     case "Not yet aired": return "À venir";
-    
-    // --- STATUS MANGA ---
     case "Finished": return "Terminé";
     case "Publishing": return "En cours de publication";
     case "On Hiatus": return "En pause";
     case "Discontinued": return "Abandonné";
     case "Not yet published": return "À venir";
-    
     default: return status || "Inconnu";
   }
 }
 
 async function fetchWithCache(endpoint: string, revalidateTime: number) {
-  // Optimisation : Délai réduit à 250ms pour fluidifier l'expérience utilisateur
+  // On utilise la fonction delay définie plus haut
   await delay(250);
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 secondes timeout
+    const timeoutId = setTimeout(() => controller.abort(), 8000); 
 
     const response = await fetch(`${BASE_URL}${endpoint}`, {
       next: { revalidate: revalidateTime },
@@ -40,7 +36,7 @@ async function fetchWithCache(endpoint: string, revalidateTime: number) {
 
     if (response.status === 429) {
         console.warn(`⚠️ Rate Limit Jikan sur ${endpoint}, attente...`);
-        await delay(1000); // Si rate limit, on attend et on pourrait réessayer (optionnel)
+        await delay(1000); 
         return null; 
     }
 
@@ -76,12 +72,9 @@ export async function getAnimeById(id: string) {
 
   if (data.synopsis) {
     try {
-      // Attention : google-translate-api-x peut être instable en prod
       const res = await translate(data.synopsis, { to: 'fr' }) as any;
       data.synopsis = res.text;
-    } catch (e) { 
-      // Fallback silencieux
-    }
+    } catch (e) { }
   }
   
   data.status = translateStatus(data.status);
@@ -104,7 +97,6 @@ export async function getMangaById(id: string) {
 }
 
 export async function searchAnime(query: string) {
-  // Limite 10 et cache court
   const data = await fetchWithCache(`/anime?q=${encodeURIComponent(query)}&sfw=true&limit=10`, 300);
   return data || [];
 }
@@ -125,7 +117,6 @@ export async function getUpcomingSeason() {
 }
 
 export async function getAnimeByYear(year: number) {
-  // Correction URL : Ajout correct des paramètres
   const url = `/anime?start_date=${year}-01-01&end_date=${year}-12-31&order_by=members&sort=desc&limit=25&sfw=true`;
   const data = await fetchWithCache(url, 7200);
   return data || [];

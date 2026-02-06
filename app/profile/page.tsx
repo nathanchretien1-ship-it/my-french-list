@@ -10,7 +10,6 @@ import UserBadge from "../components/UserBadge";
 // --- 🚧 CONFIG PROD 🚧 ---
 const ENABLE_GACHA = false; 
 
-// --- CONFIG VISUELLE ---
 const DEFAULT_BANNERS = [
   { id: 'basic_1', name: 'Bleu Nuit', url: 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800&q=80', isPremium: false },
   { id: 'basic_2', name: 'Forêt Sombre', url: 'https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?w=800&q=80', isPremium: false },
@@ -53,13 +52,12 @@ export default function ProfilePage() {
   const [statusEmoji, setStatusEmoji] = useState("👋");
   const [isAdminUser, setIsAdminUser] = useState(false);
   
-  // Listes & Filtres
+  // Listes
   const [animeCount, setAnimeCount] = useState(0);
   const [library, setLibrary] = useState<any[]>([]); 
-  const [collection, setCollection] = useState<any[]>([]); // Gacha
-  const [filter, setFilter] = useState<'all' | 'anime' | 'manga'>('all'); // <--- NOUVEAU FILTRE
+  const [collection, setCollection] = useState<any[]>([]); 
+  const [filter, setFilter] = useState<'all' | 'anime' | 'manga'>('all');
 
-  // UI
   const [showBannerSelector, setShowBannerSelector] = useState(false);
   const [showStatusSelector, setShowStatusSelector] = useState(false);
   const [isEditingUsername, setIsEditingUsername] = useState(false);
@@ -72,18 +70,12 @@ export default function ProfilePage() {
   async function getProfile() {
     try {
       setLoading(true);
-      const { data: { user },error } = await supabase.auth.getUser();
-     if (error) {
-         console.error("❌ Erreur Auth Profil:", error);
-     }
-      if (!user) {
-        console.warn("⚠️ Aucun utilisateur trouvé sur la page Profil (Redirection bloquée pour debug)");
-        //router.push("/auth");
-        return;
-      }
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) return;
       setUser(user);
 
-      // 1. Récupérer la Liste d'Animes/Mangas
+      // 1. Library
       const { data: libData, count: libCount } = await supabase
         .from('library')
         .select('*', { count: 'exact' })
@@ -93,7 +85,7 @@ export default function ProfilePage() {
       setAnimeCount(libCount || 0);
       setLibrary(libData || []);
 
-      // 2. Collection Gacha
+      // 2. Gacha
       if (ENABLE_GACHA) {
           const { data: myCards } = await supabase.from('user_characters').select('*, characters(*)').eq('user_id', user.id);
           setCollection(myCards || []);
@@ -101,48 +93,31 @@ export default function ProfilePage() {
 
       // 3. Profil
       const { data: fetchedData } = await supabase.from("profiles").select("*,is_admin").eq("id", user.id).maybeSingle();
-      let data = fetchedData;
       
-      if (!data) {
-          console.log("⚠️ Profil introuvable, tentative de réparation...");
-          const newProfile = {
-            id: user.id,
-            username: user.user_metadata?.full_name || user.email?.split('@')[0] || "Nouveau",
-            avatar_url: user.user_metadata?.avatar_url || null,
-            updated_at: new Date().toISOString()
-          };
-          
-          // On force la création
-          const { error: insertError } = await supabase.from("profiles").upsert(newProfile);
-          
-          if (!insertError) {
-             data = newProfile; // On utilise le nouveau profil immédiatement
-             console.log("✅ Profil réparé !");
-          }
-      }
-      if (data) {
-        setUsername(data.username || "");
-        setOriginalUsername(data.username || "");
-        setNameColor(data.name_color || "#ffffff");
-        setIsPremium(data.is_premium || false);
-        setRole(data.role || "member");
-        setBio(data.bio || "");
-        setStatusText(data.status_text || "");
-        setStatusEmoji(data.status_emoji || "👋");
-        setIsAdminUser(data.is_admin === true);
+      if (fetchedData) {
+        // Hydratation des données
+        setUsername(fetchedData.username || "");
+        setOriginalUsername(fetchedData.username || "");
+        setNameColor(fetchedData.name_color || "#ffffff");
+        setIsPremium(fetchedData.is_premium || false);
+        setRole(fetchedData.role || "member");
+        setBio(fetchedData.bio || "");
+        setStatusText(fetchedData.status_text || "");
+        setStatusEmoji(fetchedData.status_emoji || "👋");
+        setIsAdminUser(fetchedData.is_admin === true);
 
-        if (data.avatar_url) {
-            if (data.avatar_url.startsWith('http')) setAvatarUrl(data.avatar_url);
+        if (fetchedData.avatar_url) {
+            if (fetchedData.avatar_url.startsWith('http')) setAvatarUrl(fetchedData.avatar_url);
             else {
-                const { data: img } = supabase.storage.from('avatars').getPublicUrl(data.avatar_url);
-                setAvatarUrl(img.publicUrl);
+                const { data: img } = supabase.storage.from('avatars').getPublicUrl(fetchedData.avatar_url);
+                setAvatarUrl(`${img.publicUrl}?t=${new Date().getTime()}`);
             }
         }
-        if (data.banner_url) {
-            if (data.banner_url.startsWith('http')) setBannerUrl(data.banner_url);
+        if (fetchedData.banner_url) {
+            if (fetchedData.banner_url.startsWith('http')) setBannerUrl(fetchedData.banner_url);
             else {
-                const { data: img } = supabase.storage.from('banners').getPublicUrl(data.banner_url);
-                setBannerUrl(img.publicUrl);
+                const { data: img } = supabase.storage.from('banners').getPublicUrl(fetchedData.banner_url);
+                setBannerUrl(`${img.publicUrl}?t=${new Date().getTime()}`);
             }
         }
       }
@@ -153,7 +128,6 @@ export default function ProfilePage() {
     }
   }
 
-  // --- Helpers ---
   async function saveUsername() {
       if (username.length < 3) return toast.error("Pseudo trop court");
       if (username === originalUsername) { setIsEditingUsername(false); return; }
@@ -161,14 +135,17 @@ export default function ProfilePage() {
           setIsCheckingUsername(true);
           const { data } = await supabase.from('profiles').select('id').eq('username', username).neq('id', user.id).maybeSingle();
           if (data) return toast.error("Pseudo déjà pris !");
+          
           if (!window.confirm(`Confirmer le changement vers "${username}" ?`)) return;
+          
           const { error } = await supabase.from('profiles').update({ username }).eq('id', user.id);
           if (error) throw error;
+          
           toast.success("Pseudo mis à jour !");
           setOriginalUsername(username);
           setIsEditingUsername(false);
           router.refresh();
-      } catch (e) { toast.error("Erreur"); } finally { setIsCheckingUsername(false); }
+      } catch (e) { toast.error("Erreur lors de la mise à jour"); } finally { setIsCheckingUsername(false); }
   }
 
   async function updateProfile() {
@@ -191,15 +168,35 @@ export default function ProfilePage() {
     try {
       setUploading(true);
       const file = event.target.files[0];
-      const fileName = `${user.id}-${Math.random()}.${file.name.split(".").pop()}`;
-      await supabase.storage.from(bucket).upload(fileName, file);
+      const fileExt = file.name.split(".").pop();
+      
+      // ✅ CORRECTION : Nom de fichier FIXE pour éviter les doublons orphelins
+      // Ex: avatar_user123.jpg. Si on re-upload, ça écrase l'ancien.
+      const fileName = `${bucket === 'avatars' ? 'avatar' : 'banner'}_${user.id}.${fileExt}`;
+      
+      // On utilise upsert: true pour écraser
+      const { error: uploadError } = await supabase.storage.from(bucket).upload(fileName, file, { upsert: true });
+      if (uploadError) throw uploadError;
+
       const { data } = supabase.storage.from(bucket).getPublicUrl(fileName);
+      
+      // Cache busting pour forcer l'affichage de la nouvelle image
+      const publicUrl = `${data.publicUrl}?t=${new Date().getTime()}`;
+
       if (bucket === 'avatars') {
-          setAvatarUrl(data.publicUrl);
+          setAvatarUrl(publicUrl);
           await supabase.from('profiles').update({ avatar_url: fileName }).eq('id', user.id);
-      } else setBannerUrl(data.publicUrl); 
+      } else {
+          setBannerUrl(publicUrl); 
+          // Pas besoin de save en base pour la banner si on update juste le state local ici avant le save global
+          // Mais si on veut que ce soit immédiat :
+           await supabase.from('profiles').update({ banner_url: fileName }).eq('id', user.id);
+      }
       toast.success("Image chargée !");
-    } catch { toast.error("Erreur upload"); } finally { setUploading(false); }
+    } catch (e) { 
+        console.error(e);
+        toast.error("Erreur upload"); 
+    } finally { setUploading(false); }
   }
 
   const selectDefaultBanner = (b: any) => {
@@ -211,12 +208,8 @@ export default function ProfilePage() {
     setStatusEmoji(p.emoji); setStatusText(p.text); setShowStatusSelector(false);
   };
 
-  // --- FILTRAGE DE LA LISTE ---
   const filteredLibrary = library.filter(item => {
       if (filter === 'all') return true;
-      // On suppose que ta DB stocke 'anime' ou 'manga' dans une colonne 'type'
-      // Jikan renvoie parfois 'TV', 'Movie', 'OVA' pour anime.
-      // Si tu as normalisé en base c'est top, sinon on fait un check large :
       const itemType = item.type?.toLowerCase() || 'anime';
       if (filter === 'anime') return itemType !== 'manga' && itemType !== 'novel';
       if (filter === 'manga') return itemType === 'manga' || itemType === 'novel';
@@ -228,14 +221,14 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen pt-24 pb-10 px-4 max-w-4xl mx-auto flex flex-col gap-8">
       
-      {/* --- CARTE PROFIL (Même code d'affichage qu'avant) --- */}
+      {/* CARTE PROFIL */}
       <div className="w-full bg-slate-900 rounded-xl overflow-hidden shadow-2xl border border-white/10 relative group">
         <div className="h-60 w-full bg-slate-800 relative group/banner">
             {bannerUrl ? <Image src={bannerUrl} alt="Bannière" fill className="object-cover" unoptimized priority /> : <div className="w-full h-full bg-gradient-to-r from-slate-800 to-slate-900" />}
             <button onClick={() => { setShowBannerSelector(!showBannerSelector); setShowStatusSelector(false); }} className="absolute top-4 right-4 bg-black/60 hover:bg-black/80 text-white px-4 py-2 rounded-lg backdrop-blur border border-white/20 transition opacity-0 group-hover/banner:opacity-100 flex items-center gap-2 font-bold text-sm">📷 Modifier</button>
         </div>
 
-        {/* TIROIRS (Banner / Status) - Identique au code précédent, je garde pour la lisibilité */}
+        {/* TIROIRS DE SELECTION */}
         {showBannerSelector && (
             <div className="relative z-50 bg-slate-950 border-y border-white/10 p-6 animate-in slide-in-from-top-4 shadow-[0_20px_50px_rgba(0,0,0,0.9)]">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -283,17 +276,15 @@ export default function ProfilePage() {
                             <span>{statusEmoji}</span><span>{statusText || "Définir un statut..."}</span>
                         </div>
                     </div>
-                    {/*---test---*/}
                     <UserBadge role={role} isPremium={isPremium} animeCount={animeCount} isAdmin={isAdminUser}/>
                 </div>
                 
                 <hr className="border-white/10 my-4" />
 
-                {/* --- 👇 MA BIBLIOTHÈQUE AVEC FILTRES 👇 --- */}
+                {/* MA BIBLIOTHÈQUE */}
                 <div className="mb-8">
                     <div className="flex items-center justify-between mb-4">
                         <h3 className="text-xs font-bold text-gray-400 uppercase">Ma Bibliothèque ({library.length})</h3>
-                        {/* ONGLETS FILTRES */}
                         <div className="flex bg-slate-900 p-1 rounded-lg border border-white/10">
                             {(['all', 'anime', 'manga'] as const).map((f) => (
                                 <button
@@ -310,7 +301,6 @@ export default function ProfilePage() {
                     {filteredLibrary.length > 0 ? (
                         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
                             {filteredLibrary.map((item: any) => {
-                                // Détection du type pour le lien et l'icône
                                 const isManga = item.type?.toLowerCase() === 'manga' || item.type?.toLowerCase() === 'novel';
                                 const targetLink = isManga ? `/manga/${item.id}` : `/anime/${item.id}`;
                                 const icon = isManga ? '📖' : '📺';
@@ -322,7 +312,6 @@ export default function ProfilePage() {
                                         ) : (
                                             <div className="w-full h-full bg-slate-800 flex items-center justify-center text-xs text-gray-500">Pas d'image</div>
                                         )}
-                                        {/* Overlay Titre */}
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition flex flex-col justify-end p-2">
                                             <p className="text-xs font-bold text-white leading-tight line-clamp-2">{item.title}</p>
                                             <div className="flex justify-between items-center mt-1">
@@ -330,7 +319,6 @@ export default function ProfilePage() {
                                                 <span className="text-xs">{icon}</span>
                                             </div>
                                         </div>
-                                        {/* Statut (Badge en haut) */}
                                         {item.status && (
                                             <div className="absolute top-1 right-1 px-1.5 py-0.5 rounded text-[8px] font-bold bg-black/60 text-white backdrop-blur">
                                                 {item.status}
@@ -350,7 +338,6 @@ export default function ProfilePage() {
                     )}
                 </div>
 
-                {/* --- SECTION GACHA (Cachée si ENABLE_GACHA = false) --- */}
                 {ENABLE_GACHA && collection.length > 0 && (
                     <>
                         <hr className="border-white/10 my-4" />
@@ -377,7 +364,7 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* --- FORMULAIRES EDITION --- */}
+      {/* FORMULAIRES EDITION */}
       <div className="grid md:grid-cols-2 gap-6 opacity-90 hover:opacity-100 transition">
         <div className="bg-slate-900 border border-white/10 p-6 rounded-xl space-y-4">
             <h3 className="text-lg font-bold text-white mb-4">Identité</h3>
