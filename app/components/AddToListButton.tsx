@@ -85,7 +85,6 @@ export default function AddToListButton({ anime, mediaType = "anime", userId, co
         title: anime.title,
         image_url: imageUrl,
         status: newStatus, 
-        score: 0,
         type: mediaType
       }, { onConflict: 'user_id, jikan_id, type' });
 

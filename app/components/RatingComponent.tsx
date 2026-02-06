@@ -25,41 +25,57 @@ export default function RatingComponent({ mediaId, mediaType, mediaTitle, mediaI
     if(userId) fetchRating();
   }, [userId, mediaId, supabase]);
 
-  const handleRate = async (score: number) => {
-      if (!userId) return toast.error("Connecte-toi pour noter !");
-      
-      setRating(score);
-      
-      // 1. Sauvegarder dans Library
-      const { error } = await supabase.from('library').upsert({
-          user_id: userId,
-          jikan_id: mediaId,
-          type: mediaType,
-          title: mediaTitle,
-          image_url: mediaImage,
-          score: score,
-          // Si l'objet n'existe pas, on met un statut par défaut, sinon on garde l'existant (grâce au upsert partiel implicite si on omet status ? Non, il faut faire attention)
-          // Mieux : On update juste le score si existe, sinon on insère tout.
-      }, { onConflict: 'user_id, jikan_id, type' });
+const handleRate = async (score: number) => {
+    if (!userId) return toast.error("Connecte-toi pour noter !");
+    setRating(score);
+    
+    // 1. On vérifie si l'item existe déjà pour ne pas écraser le statut
+    const { data: existing } = await supabase
+        .from('library')
+        .select('status')
+        .eq('user_id', userId)
+        .eq('jikan_id', mediaId)
+        .eq('type', mediaType)
+        .maybeSingle();
 
-      if (error) {
-          toast.error("Erreur sauvegarde note");
-          return;
-      }
+    // Si pas de statut (nouveau), on met 'completed' par défaut car on note rarement ce qu'on n'a pas vu
+    // Sinon on garde le statut existant (undefined dans l'objet = pas de changement pour upsert)
+    const statusToSet = existing ? undefined : 'completed'; 
 
-      // 2. Ajouter dans Activity Feed
-      await supabase.from('activities').insert({
-          user_id: userId,
-          media_id: mediaId,
-          media_type: mediaType,
-          media_title: mediaTitle,
-          media_image: mediaImage,
-          action_type: 'rated',
-          rating: score
-      });
+    const payload: any = {
+        user_id: userId,
+        jikan_id: mediaId,
+        type: mediaType,
+        title: mediaTitle,
+        image_url: mediaImage,
+        score: score,
+    };
 
-      toast.success(`Noté ${score}/10 !`);
-  };
+    if (statusToSet) {
+        payload.status = statusToSet;
+    }
+
+    const { error } = await supabase.from('library').upsert(payload, { onConflict: 'user_id, jikan_id, type' });
+
+    if (error) {
+        toast.error("Erreur sauvegarde note");
+        return;
+    }
+
+    // 2. Activité (Code existant...)
+    await supabase.from('activities').insert({
+       // ... tes champs activity
+       user_id: userId,
+       media_id: mediaId,
+       media_type: mediaType,
+       media_title: mediaTitle,
+       media_image: mediaImage,
+       action_type: 'rated',
+       rating: score
+    });
+
+    toast.success(`Noté ${score}/10 !`);
+};
 
   return (
     <div className="flex flex-col gap-2 bg-[#1e293b]/50 p-4 rounded-xl border border-white/5 backdrop-blur-sm">
