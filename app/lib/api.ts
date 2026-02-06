@@ -56,14 +56,18 @@ async function fetchWithCache(endpoint: string, revalidateTime: number) {
 
 // --- LES FONCTIONS EXPORTÉES ---
 
-export async function getTopAnime(page = 1, filter: 'bypopularity' | 'favorite' | 'airing' = 'bypopularity') {
+export async function getTopAnime(page = 1, filter: 'airing' | 'favorite' | 'bypopularity' = 'bypopularity') {
   let queryParams = `page=${page}&limit=24&sfw=true`;
-  if (filter === 'favorite') {
-      queryParams += '&order_by=score&sort=desc';
-  } else if (filter === 'bypopularity') {
-      queryParams += '&order_by=members&sort=desc';
-  } else if (filter === 'airing') {
+
+  if (filter === 'airing') {
+      // "Meilleurs du moment" -> Top Airing
       queryParams += '&filter=airing';
+  } else if (filter === 'favorite') {
+      // "Meilleure note" -> Trié par score
+      queryParams += '&order_by=score&sort=desc';
+  } else {
+      // "Populaire" (Défaut) -> Trié par nombre de membres
+      queryParams += '&order_by=members&sort=desc';
   }
 
   const data = await fetchWithCache(`/top/anime?${queryParams}`, 3600);
