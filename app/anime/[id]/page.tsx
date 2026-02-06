@@ -3,92 +3,214 @@ import Image from "next/image";
 import AddToListButton from "../../components/AddToListButton";
 import { createClient } from "../../lib/supabase/server"; 
 
+// Composant utilitaire pour afficher une ligne d'info
+const InfoRow = ({ label, value }: { label: string, value: string | number | null | undefined }) => {
+    if (!value) return null;
+    return (
+        <div className="flex justify-between items-start py-2 border-b border-white/5 last:border-0">
+            <span className="text-gray-400 text-sm font-medium">{label}</span>
+            <span className="text-white text-sm text-right max-w-[60%]">{value}</span>
+        </div>
+    );
+};
+
 export default async function AnimePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const anime = await getAnimeById(id);
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (!anime) return <div className="text-white text-center py-20">Introuvable...</div>;
+  if (!anime) return <div className="text-white text-center py-20">Anime introuvable...</div>;
 
+  // Formatage des listes (Studios, Genres...)
+  const studios = anime.studios?.map((s: any) => s.name).join(", ");
+  const producers = anime.producers?.map((p: any) => p.name).join(", ");
+  const genres = anime.genres?.map((g: any) => g.name).join(", ");
+  const themes = anime.themes?.map((t: any) => t.name).join(", ");
+  
   return (
     <div className="min-h-screen bg-[#0f111a] text-white pb-20">
       
-      {/* HEADER */}
-      <div className="relative h-[40vh] w-full overflow-hidden">
-        <div className="absolute inset-0 opacity-30 blur-xl scale-110">
+      {/* --- HEADER BANNER --- */}
+      <div className="relative h-[50vh] w-full overflow-hidden">
+        <div className="absolute inset-0 opacity-40 blur-xl scale-110">
            {anime.images?.jpg?.large_image_url && (
              <Image src={anime.images.jpg.large_image_url} alt="Bg" fill className="object-cover" loading="lazy" unoptimized />
            )}
         </div>
-        <div className="absolute inset-0 bg-gradient-to-t from-[#0f111a] via-[#0f111a]/50 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#0f111a] via-[#0f111a]/60 to-transparent" />
+        
+        {/* Titre et Stats rapides sur la bannière */}
+        <div className="absolute bottom-0 left-0 w-full p-4 md:p-8 max-w-7xl mx-auto flex flex-col md:flex-row items-end md:items-center gap-6 z-10 pb-12 md:pb-24">
+             <div className="flex-1">
+                 <h1 className="text-4xl md:text-6xl font-black mb-2 text-white drop-shadow-lg leading-tight">
+                    {anime.title}
+                 </h1>
+                 <p className="text-lg md:text-xl text-gray-300 italic font-light">{anime.title_japanese}</p>
+             </div>
+             
+             {/* Badges Principaux */}
+             <div className="flex gap-4">
+                 <div className="flex flex-col items-center bg-black/40 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10">
+                     <span className="text-xs text-gray-400 uppercase font-bold">Score</span>
+                     <span className="text-2xl font-bold text-yellow-400">★ {anime.score || "N/A"}</span>
+                     <span className="text-[10px] text-gray-500">{anime.scored_by?.toLocaleString()} votes</span>
+                 </div>
+                 <div className="flex flex-col items-center bg-black/40 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10">
+                     <span className="text-xs text-gray-400 uppercase font-bold">Rang</span>
+                     <span className="text-2xl font-bold text-white">#{anime.rank || "N/A"}</span>
+                 </div>
+                 <div className="flex flex-col items-center bg-black/40 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10">
+                     <span className="text-xs text-gray-400 uppercase font-bold">Popularité</span>
+                     <span className="text-2xl font-bold text-white">#{anime.popularity || "N/A"}</span>
+                 </div>
+             </div>
+        </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 relative -mt-32 z-10">
-        <div className="flex flex-col md:flex-row gap-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 relative -mt-16 z-20">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           
-          {/* GAUCHE : Affiche + Boutons */}
-          <div className="flex-shrink-0 mx-auto md:mx-0 w-64 flex flex-col gap-4">
-            <div className="relative h-[360px] w-full rounded-xl overflow-hidden shadow-2xl border-4 border-[#1e293b] bg-gray-800">
+          {/* --- COLONNE GAUCHE (Affiche + Actions + Infos Clés) --- */}
+          <div className="lg:col-span-1 flex flex-col gap-6">
+            <div className="relative aspect-[2/3] w-full rounded-xl overflow-hidden shadow-2xl border-4 border-[#1e293b] bg-gray-800">
               {anime.images?.jpg?.large_image_url && (
                 <Image src={anime.images.jpg.large_image_url} alt={anime.title} fill className="object-cover" loading="lazy" unoptimized />
               )}
             </div>
             
-            {/* BOUTONS D'ACTION (Mode complet) */}
             {user ? (
-                <AddToListButton 
-                    anime={anime} 
-                    mediaType="anime" 
-                    userId={user.id} 
-                    compact={false} // 👈 Affiche les boutons textes complets
-                />
+                <AddToListButton anime={anime} mediaType="anime" userId={user.id} compact={false} />
             ) : (
-                <div className="bg-white/5 p-4 rounded-lg text-center border border-white/10">
-                    <p className="text-sm text-gray-400">Connectez-vous pour gérer votre liste</p>
+                <div className="bg-white/5 p-4 rounded-lg text-center border border-white/10 text-sm text-gray-400">
+                    Connectez-vous pour ajouter à votre liste
                 </div>
             )}
+
+            {/* Panneau d'informations latéral */}
+            <div className="bg-[#1e293b]/50 p-5 rounded-xl border border-white/5 backdrop-blur-sm">
+                <h3 className="text-white font-bold mb-4 uppercase text-sm border-b border-white/10 pb-2">Informations</h3>
+                <div className="flex flex-col gap-1">
+                    <InfoRow label="Type" value={anime.type} />
+                    <InfoRow label="Épisodes" value={anime.episodes || "Inconnu"} />
+                    <InfoRow label="Statut" value={anime.status} />
+                    <InfoRow label="Diffusion" value={anime.aired?.string} />
+                    <InfoRow label="Saison" value={anime.season ? `${anime.season} ${anime.year}` : null} />
+                    <InfoRow label="Studio" value={studios} />
+                    <InfoRow label="Source" value={anime.source} />
+                    <InfoRow label="Durée" value={anime.duration} />
+                    <InfoRow label="Rating" value={anime.rating} />
+                </div>
+            </div>
+             
+             {/* Liens externes (si dispos) */}
+             {/* Liens externes */}
+<div className="flex flex-wrap gap-2 mt-6">
+     {anime.external?.map((link: any, i: number) => (
+         <a 
+            key={`${link.name}-${i}`} // ✅ Correction ici : Ajout de l'index
+            href={link.url} 
+            target="_blank" 
+            rel="noopener noreferrer" 
+            className="text-xs bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-full border border-white/10 transition"
+         >
+             {link.name}
+         </a>
+     ))}
+</div>
           </div>
 
-          {/* DROITE : Infos */}
-          <div className="flex-1 pt-4 md:pt-10 text-center md:text-left">
-            <h1 className="text-4xl md:text-5xl font-extrabold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400">
-              {anime.title}
-            </h1>
-            <p className="text-lg text-gray-400 mb-6 italic">{anime.title_japanese}</p>
+          {/* --- COLONNE DROITE (Contenu Principal) --- */}
+          <div className="lg:col-span-3 flex flex-col gap-8 pt-4 lg:pt-0">
+            
+            {/* Synopsis */}
+            <section>
+                <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
+                    <span className="w-1 h-6 bg-indigo-500 rounded-full"></span>Synopsis
+                </h2>
+                <div className="bg-[#1e293b]/30 p-6 rounded-2xl border border-white/5 text-gray-300 leading-relaxed text-base">
+                    {anime.synopsis || "Aucun synopsis disponible."}
+                </div>
+                {anime.background && (
+                    <div className="mt-4 p-4 bg-yellow-900/10 border border-yellow-500/20 rounded-xl text-sm text-yellow-200/80">
+                        <span className="font-bold block mb-1">Contexte :</span> {anime.background}
+                    </div>
+                )}
+            </section>
 
-            <div className="flex flex-wrap justify-center md:justify-start gap-3 mb-8">
-              <span className="bg-yellow-500/20 text-yellow-400 border border-yellow-500/30 px-3 py-1 rounded-full text-sm font-bold">
-                ★ {anime.score || "?"}
-              </span>
-              {/* ✅ Le statut s'affiche ici (déjà traduit par l'API) */}
-              <span className={`px-3 py-1 rounded-full text-sm font-bold border ${
-                  anime.status === 'Terminé' ? 'bg-red-500/20 text-red-400 border-red-500/30' :
-                  anime.status === 'En cours' ? 'bg-green-500/20 text-green-400 border-green-500/30' :
-                  'bg-blue-500/20 text-blue-400 border-blue-500/30'
-              }`}>
-                {anime.status || "Inconnu"}
-              </span>
-              <span className="bg-purple-500/20 text-purple-400 border border-purple-500/30 px-3 py-1 rounded-full text-sm font-bold">
-                {anime.episodes ? `${anime.episodes} Épisodes` : "En cours"}
-              </span>
-            </div>
-
-            <div className="bg-[#1e293b]/50 p-6 rounded-2xl border border-white/5 backdrop-blur-sm">
-              <h2 className="text-xl font-bold mb-3 text-purple-300">Synopsis</h2>
-              <p className="text-gray-300 leading-relaxed text-sm md:text-base">
-                {anime.synopsis || "Pas de synopsis."}
-              </p>
-            </div>
-
+            {/* Trailer */}
             {anime.trailer?.embed_url && (
-              <div className="mt-8">
-                <h3 className="text-xl font-bold mb-4 text-white">Bande-annonce</h3>
-                <div className="aspect-video w-full rounded-xl overflow-hidden border border-white/10 shadow-lg">
+              <section>
+                <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
+                    <span className="w-1 h-6 bg-red-500 rounded-full"></span>Trailer
+                </h2>
+                <div className="aspect-video w-full rounded-xl overflow-hidden border border-white/10 shadow-lg bg-black">
                   <iframe src={anime.trailer.embed_url} className="w-full h-full" allowFullScreen title="Trailer" />
                 </div>
-              </div>
+              </section>
             )}
+
+            {/* Détails supplémentaires (Genres, Staff, Music) */}
+            <div className="grid md:grid-cols-2 gap-6">
+                <div className="bg-[#1e293b]/30 p-6 rounded-2xl border border-white/5">
+                    <h3 className="font-bold text-lg mb-4 text-indigo-300">Genres & Thèmes</h3>
+                    <div className="flex flex-wrap gap-2">
+                        {genres && genres.split(', ').map((g: string) => <span key={g} className="px-3 py-1 bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded-full text-xs font-bold">{g}</span>)}
+                        {themes && themes.split(', ').map((t: string) => <span key={t} className="px-3 py-1 bg-purple-500/20 text-purple-300 border border-purple-500/30 rounded-full text-xs font-bold">{t}</span>)}
+                        {!genres && !themes && <span className="text-gray-500 text-sm">Non spécifié</span>}
+                    </div>
+                </div>
+
+                <div className="bg-[#1e293b]/30 p-6 rounded-2xl border border-white/5">
+                    <h3 className="font-bold text-lg mb-4 text-pink-300">Staff & Production</h3>
+                    <div className="space-y-3">
+                        {producers && (
+                            <div>
+                                <span className="text-xs text-gray-500 uppercase font-bold block mb-1">Producteurs</span>
+                                <p className="text-sm text-gray-300">{producers}</p>
+                            </div>
+                        )}
+                        {anime.licensors && anime.licensors.length > 0 && (
+                            <div>
+                                <span className="text-xs text-gray-500 uppercase font-bold block mb-1">Licencié par</span>
+                                <p className="text-sm text-gray-300">{anime.licensors.map((l:any) => l.name).join(', ')}</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* Musiques (Opening / Ending) */}
+            {(anime.theme?.openings?.length > 0 || anime.theme?.endings?.length > 0) && (
+                <section>
+                    <h2 className="text-2xl font-bold mb-4 flex items-center gap-2">
+                        <span className="w-1 h-6 bg-green-500 rounded-full"></span>Musiques
+                    </h2>
+                    <div className="grid md:grid-cols-2 gap-6">
+                        {anime.theme?.openings?.length > 0 && (
+                            <div className="bg-[#1e293b]/30 p-5 rounded-xl border border-white/5">
+                                <h4 className="text-sm font-bold text-green-400 uppercase mb-3">Openings 🎵</h4>
+                                <ul className="space-y-2 text-sm text-gray-400 list-disc pl-4">
+                                    {anime.theme.openings.map((op: string, i: number) => (
+                                        <li key={i}>{op}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                        {anime.theme?.endings?.length > 0 && (
+                             <div className="bg-[#1e293b]/30 p-5 rounded-xl border border-white/5">
+                                <h4 className="text-sm font-bold text-blue-400 uppercase mb-3">Endings 🌙</h4>
+                                <ul className="space-y-2 text-sm text-gray-400 list-disc pl-4">
+                                    {anime.theme.endings.map((ed: string, i: number) => (
+                                        <li key={i}>{ed}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                    </div>
+                </section>
+            )}
+
           </div>
         </div>
       </div>
