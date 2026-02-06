@@ -136,6 +136,7 @@ export default function Navbar({ user: initialUser }: NavbarProps) {
     setUser(null);
     toast.info("À bientôt !");
     router.refresh();
+    router.push('/')
   };
 
   return (
