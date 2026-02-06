@@ -93,6 +93,21 @@ export default function AddToListButton({ anime, mediaType = "anime", userId, co
         setStatus(newStatus);
         const actionText = newStatus === 'plan_to_watch' ? textFullPlan : textFullCompleted;
         toast.success(`Ajouté à : ${actionText}`);
+        if (newStatus) { // On n'enregistre pas les suppressions
+    const action = newStatus === 'completed' ? 'add_completed' : 'add_plan';
+    
+    // On ne bloque pas l'UI pour ça (pas de await bloquant)
+    supabase.from('activities').insert({
+        user_id: currentUserId,
+        media_id: anime.mal_id,
+        media_type: mediaType,
+        media_title: anime.title,
+        media_image: anime.images?.jpg?.large_image_url || anime.images?.jpg?.image_url,
+        action_type: action
+    }).then(({ error }) => {
+        if (error) console.error("Erreur activité", error);
+    });
+}
       } else {
         toast.error("Erreur lors de la mise à jour");
       }

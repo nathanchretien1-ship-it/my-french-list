@@ -1,6 +1,8 @@
-import { getMangaById } from "../../lib/api";
+import { getMangaById, getRecommendations } from "../../lib/api";
 import Image from "next/image";
 import AddToListButton from "../../components/AddToListButton";
+import RatingComponent from "../../components/RatingComponent";
+import AnimeCard from "../../components/AnimeCard"; // On utilise AnimeCard pour les mangas aussi
 import { createClient } from "../../lib/supabase/server"; 
 
 const InfoRow = ({ label, value }: { label: string, value: string | number | null | undefined }) => {
@@ -15,12 +17,19 @@ const InfoRow = ({ label, value }: { label: string, value: string | number | nul
 
 export default async function MangaPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  
+  // 1. Récupération Manga
   const manga = await getMangaById(id);
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!manga) return <div className="text-white text-center py-20">Manga introuvable...</div>;
 
+  // 2. Recommandations
+  const genreIds = manga.genres?.map((g: any) => g.mal_id) || [];
+  const recommendations = await getRecommendations(genreIds, 'manga', manga.mal_id);
+
+  // 3. Formatage
   const authors = manga.authors?.map((a: any) => a.name).join(", ");
   const serializations = manga.serializations?.map((s: any) => s.name).join(", ");
   const genres = manga.genres?.map((g: any) => g.name).join(", ");
@@ -29,11 +38,11 @@ export default async function MangaPage({ params }: { params: Promise<{ id: stri
   return (
     <div className="min-h-screen bg-[#0f111a] text-white pb-20">
       
-      {/* --- HEADER BANNER --- */}
+      {/* HEADER BANNER */}
       <div className="relative h-[50vh] w-full overflow-hidden">
         <div className="absolute inset-0 opacity-40 blur-xl scale-110">
            {manga.images?.jpg?.large_image_url && (
-             <Image src={manga.images.jpg.large_image_url} alt="Bg" fill className="object-cover" loading="lazy" unoptimized />
+             <Image src={manga.images.jpg.large_image_url} alt="Background" fill className="object-cover" loading="lazy" unoptimized />
            )}
         </div>
         <div className="absolute inset-0 bg-gradient-to-t from-[#0f111a] via-[#0f111a]/60 to-transparent" />
@@ -52,11 +61,11 @@ export default async function MangaPage({ params }: { params: Promise<{ id: stri
                      <span className="text-2xl font-bold text-yellow-400">★ {manga.score || "N/A"}</span>
                      <span className="text-[10px] text-gray-500">{manga.scored_by?.toLocaleString()} votes</span>
                  </div>
-                 <div className="flex flex-col items-center bg-black/40 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10">
+                 <div className="hidden sm:flex flex-col items-center bg-black/40 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10">
                      <span className="text-xs text-gray-400 uppercase font-bold">Rang</span>
                      <span className="text-2xl font-bold text-white">#{manga.rank || "N/A"}</span>
                  </div>
-                 <div className="flex flex-col items-center bg-black/40 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10">
+                 <div className="hidden sm:flex flex-col items-center bg-black/40 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10">
                      <span className="text-xs text-gray-400 uppercase font-bold">Popularité</span>
                      <span className="text-2xl font-bold text-white">#{manga.popularity || "N/A"}</span>
                  </div>
@@ -67,7 +76,7 @@ export default async function MangaPage({ params }: { params: Promise<{ id: stri
       <div className="max-w-7xl mx-auto px-4 sm:px-6 relative -mt-16 z-20">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           
-          {/* --- GAUCHE --- */}
+          {/* --- COLONNE GAUCHE --- */}
           <div className="lg:col-span-1 flex flex-col gap-6">
             <div className="relative aspect-[2/3] w-full rounded-xl overflow-hidden shadow-2xl border-4 border-[#1e293b] bg-gray-800">
               {manga.images?.jpg?.large_image_url && (
@@ -76,10 +85,20 @@ export default async function MangaPage({ params }: { params: Promise<{ id: stri
             </div>
             
             {user ? (
-                <AddToListButton anime={manga} mediaType="manga" userId={user.id} compact={false} />
+                <div className="flex flex-col gap-4">
+                    <AddToListButton anime={manga} mediaType="manga" userId={user.id} compact={false} />
+                    {/* Notation pour Manga */}
+                    <RatingComponent 
+                        mediaId={manga.mal_id} 
+                        mediaType="manga" 
+                        mediaTitle={manga.title} 
+                        mediaImage={manga.images?.jpg?.large_image_url} 
+                        userId={user.id} 
+                    />
+                </div>
             ) : (
                 <div className="bg-white/5 p-4 rounded-lg text-center border border-white/10 text-sm text-gray-400">
-                    Connectez-vous pour ajouter à votre liste
+                    Connectez-vous pour gérer votre liste
                 </div>
             )}
 
@@ -98,23 +117,22 @@ export default async function MangaPage({ params }: { params: Promise<{ id: stri
                 </div>
             </div>
 
-            {/* Liens externes */}
-<div className="flex flex-wrap gap-2 mt-6">
-     {manga.external?.map((link: any, i: number) => (
-         <a 
-            key={`${link.name}-${i}`} // ✅ Correction ici : Ajout de l'index
-            href={link.url} 
-            target="_blank" 
-            rel="noopener noreferrer" 
-            className="text-xs bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-full border border-white/10 transition"
-         >
-             {link.name}
-         </a>
-     ))}
-</div>
+            <div className="flex flex-wrap gap-2">
+                 {manga.external?.map((link: any, i: number) => (
+                     <a 
+                        key={`${link.name}-${i}`} 
+                        href={link.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="text-xs bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-full border border-white/10 transition"
+                     >
+                         {link.name}
+                     </a>
+                 ))}
+             </div>
           </div>
 
-          {/* --- DROITE --- */}
+          {/* --- COLONNE DROITE --- */}
           <div className="lg:col-span-3 flex flex-col gap-8 pt-4 lg:pt-0">
             
             <section>
@@ -142,13 +160,13 @@ export default async function MangaPage({ params }: { params: Promise<{ id: stri
                 </div>
             </div>
 
-            {/* Auteurs Détails (Optionnel si tu veux plus de détails sur les auteurs) */}
+            {/* Auteurs Détails */}
              {manga.authors?.length > 0 && (
                 <section>
                     <h2 className="text-xl font-bold mb-4 text-white">Auteurs</h2>
                     <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4">
-                        {manga.authors.map((author: any) => (
-                            <a key={author.mal_id} href={author.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 bg-[#1e293b]/50 p-3 rounded-lg border border-white/5 hover:bg-[#1e293b] transition">
+                        {manga.authors.map((author: any, i: number) => (
+                            <a key={`${author.mal_id}-${i}`} href={author.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 bg-[#1e293b]/50 p-3 rounded-lg border border-white/5 hover:bg-[#1e293b] transition">
                                 <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-gray-400">
                                     {author.name[0]}
                                 </div>
@@ -157,6 +175,21 @@ export default async function MangaPage({ params }: { params: Promise<{ id: stri
                                     <p className="text-xs text-gray-400">Auteur</p>
                                 </div>
                             </a>
+                        ))}
+                    </div>
+                </section>
+            )}
+
+            {/* ✨ RECOMMANDATIONS MANGA */}
+            {recommendations.length > 0 && (
+                <section className="mt-8 border-t border-white/10 pt-8">
+                    <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
+                        <span className="w-1 h-6 bg-orange-500 rounded-full"></span>
+                        Lectures recommandées
+                    </h2>
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                        {recommendations.map((rec: any) => (
+                            <AnimeCard key={rec.mal_id} anime={rec} type="manga" user={user} />
                         ))}
                     </div>
                 </section>

@@ -114,3 +114,26 @@ export async function getAnimeByYear(year: number) {
   const data = await fetchWithCache(url, 7200);
   return data || [];
 }
+export async function getRecommendations(genres: number[], type: 'anime' | 'manga' = 'anime', excludeId: number) {
+  if (!genres || genres.length === 0) return [];
+  
+  // On prend les 3 premiers genres pour ne pas être trop restrictif
+  const genresString = genres.slice(0, 3).join(',');
+  
+  // On cherche par genre, trié par popularité
+  const endpoint = type === 'anime' ? '/anime' : '/manga';
+  const url = `${endpoint}?genres=${genresString}&order_by=members&sort=desc&limit=6&sfw=true`;
+  
+  const data = await fetchWithCache(url, 3600); // Cache 1h
+  
+  if (!data) return [];
+  
+  // On exclut l'œuvre actuelle et on traduit le statut
+  return data
+    .filter((item: any) => item.mal_id !== excludeId)
+    .slice(0, 5) // Garde les 5 meilleurs
+    .map((item: any) => ({
+        ...item,
+        status: translateStatus(item.status)
+    }));
+}
