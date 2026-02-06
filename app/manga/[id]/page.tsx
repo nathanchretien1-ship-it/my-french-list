@@ -1,8 +1,9 @@
 import { getMangaById, getRecommendations } from "../../lib/api";
 import Image from "next/image";
+import Link from "next/link"; // ✅ Import Link ajouté
 import AddToListButton from "../../components/AddToListButton";
 import RatingComponent from "../../components/RatingComponent";
-import AnimeCard from "../../components/AnimeCard"; // On utilise AnimeCard pour les mangas aussi
+import AnimeCard from "../../components/AnimeCard"; 
 import { createClient } from "../../lib/supabase/server"; 
 
 const InfoRow = ({ label, value }: { label: string, value: string | number | null | undefined }) => {
@@ -18,18 +19,22 @@ const InfoRow = ({ label, value }: { label: string, value: string | number | nul
 export default async function MangaPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   
-  // 1. Récupération Manga
   const manga = await getMangaById(id);
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!manga) return <div className="text-white text-center py-20">Manga introuvable...</div>;
 
-  // 2. Recommandations
   const genreIds = manga.genres?.map((g: any) => g.mal_id) || [];
   const recommendations = await getRecommendations(genreIds, 'manga', manga.mal_id);
 
-  // 3. Formatage
+  // --- 1. EXTRACTION DES RELATIONS ---
+  const relations = manga.relations || [];
+  const prequels = relations.find((r: any) => r.relation === 'Prequel')?.entry || [];
+  const sequels = relations.find((r: any) => r.relation === 'Sequel')?.entry || [];
+  // Tu peux aussi ajouter 'Adaptation' si tu veux voir l'anime lié au manga
+  const adaptations = relations.find((r: any) => r.relation === 'Adaptation')?.entry || [];
+
   const authors = manga.authors?.map((a: any) => a.name).join(", ");
   const serializations = manga.serializations?.map((s: any) => s.name).join(", ");
   const genres = manga.genres?.map((g: any) => g.name).join(", ");
@@ -87,7 +92,6 @@ export default async function MangaPage({ params }: { params: Promise<{ id: stri
             {user ? (
                 <div className="flex flex-col gap-4">
                     <AddToListButton anime={manga} mediaType="manga" userId={user.id} compact={false} />
-                    {/* Notation pour Manga */}
                     <RatingComponent 
                         mediaId={manga.mal_id} 
                         mediaType="manga" 
@@ -117,15 +121,75 @@ export default async function MangaPage({ params }: { params: Promise<{ id: stri
                 </div>
             </div>
 
+            {/* --- 2. NOUVEAU BLOC : CHRONOLOGIE / RELATIONS --- */}
+            {(prequels.length > 0 || sequels.length > 0 || adaptations.length > 0) && (
+                <div className="bg-[#1e293b]/50 p-5 rounded-xl border border-white/5 backdrop-blur-sm">
+                    <h3 className="text-white font-bold mb-4 uppercase text-sm border-b border-white/10 pb-2 flex items-center gap-2">
+                        <span>⏳</span> Univers
+                    </h3>
+                    <div className="flex flex-col gap-4">
+                        
+                        {prequels.length > 0 && (
+                            <div>
+                                <span className="text-xs font-bold text-gray-500 uppercase block mb-2">Précédemment</span>
+                                <div className="flex flex-col gap-2">
+                                    {prequels.map((ref: any) => (
+                                        <Link 
+                                            key={ref.mal_id} 
+                                            href={`/${ref.type}/${ref.mal_id}`} 
+                                            className="group flex items-center gap-2 bg-black/20 hover:bg-white/10 p-2 rounded-lg border border-white/5 hover:border-white/20 transition"
+                                        >
+                                            <span className="text-indigo-400 text-xs group-hover:text-indigo-300">⬅</span>
+                                            <span className="text-xs text-gray-300 group-hover:text-white font-medium line-clamp-1">{ref.name}</span>
+                                        </Link>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {sequels.length > 0 && (
+                            <div>
+                                <span className="text-xs font-bold text-gray-500 uppercase block mb-2">La suite</span>
+                                <div className="flex flex-col gap-2">
+                                    {sequels.map((ref: any) => (
+                                        <Link 
+                                            key={ref.mal_id} 
+                                            href={`/${ref.type}/${ref.mal_id}`} 
+                                            className="group flex items-center gap-2 bg-indigo-500/10 hover:bg-indigo-500/20 p-2 rounded-lg border border-indigo-500/20 hover:border-indigo-500/40 transition"
+                                        >
+                                            <span className="text-indigo-400 text-xs">➡</span>
+                                            <span className="text-xs text-indigo-200 group-hover:text-white font-medium line-clamp-1">{ref.name}</span>
+                                        </Link>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* BONUS : Adaptations Anime */}
+                        {adaptations.length > 0 && (
+                            <div>
+                                <span className="text-xs font-bold text-gray-500 uppercase block mb-2">Anime</span>
+                                <div className="flex flex-col gap-2">
+                                    {adaptations.map((ref: any) => (
+                                        <Link 
+                                            key={ref.mal_id} 
+                                            href={`/anime/${ref.mal_id}`} 
+                                            className="group flex items-center gap-2 bg-pink-500/10 hover:bg-pink-500/20 p-2 rounded-lg border border-pink-500/20 hover:border-pink-500/40 transition"
+                                        >
+                                            <span className="text-pink-400 text-xs">📺</span>
+                                            <span className="text-xs text-pink-200 group-hover:text-white font-medium line-clamp-1">{ref.name}</span>
+                                        </Link>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
             <div className="flex flex-wrap gap-2">
                  {manga.external?.map((link: any, i: number) => (
-                     <a 
-                        key={`${link.name}-${i}`} 
-                        href={link.url} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        className="text-xs bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-full border border-white/10 transition"
-                     >
+                     <a key={`${link.name}-${i}`} href={link.url} target="_blank" rel="noopener noreferrer" className="text-xs bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-full border border-white/10 transition">
                          {link.name}
                      </a>
                  ))}
@@ -180,7 +244,7 @@ export default async function MangaPage({ params }: { params: Promise<{ id: stri
                 </section>
             )}
 
-            {/* ✨ RECOMMANDATIONS MANGA */}
+            {/* Recommandations */}
             {recommendations.length > 0 && (
                 <section className="mt-8 border-t border-white/10 pt-8">
                     <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
