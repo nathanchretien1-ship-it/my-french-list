@@ -7,16 +7,16 @@ import Link from "next/link";
 import { toast } from "sonner";
 import UserBadge from "../components/UserBadge";
 
-// --- 🚧 CONFIG PROD 🚧 ---
-const ENABLE_GACHA = false; 
+// --- CONFIG ---
+const ENABLE_GACHA = false; // Mettre à true si tu réactives le Gacha
 
+// Styles de bannières par défaut
 const DEFAULT_BANNERS = [
   { id: 'basic_1', name: 'Bleu Nuit', url: 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800&q=80', isPremium: false },
   { id: 'basic_2', name: 'Forêt Sombre', url: 'https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?w=800&q=80', isPremium: false },
   { id: 'basic_3', name: 'Gris Minimal', url: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?w=800&q=80', isPremium: false },
   { id: 'prem_1', name: 'Cyber City', url: 'https://images.unsplash.com/photo-1535295972055-1c762f4483e5?w=800&q=80', isPremium: true },
   { id: 'prem_2', name: 'Neon Vibes', url: 'https://images.unsplash.com/photo-1563089145-599997674d42?w=800&q=80', isPremium: true },
-  { id: 'prem_3', name: 'Galaxy', url: 'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?w=800&q=80', isPremium: true },
 ];
 
 const PRESET_STATUSES = [
@@ -25,10 +25,7 @@ const PRESET_STATUSES = [
     { emoji: '💻', text: 'En train de coder', isPremium: false },
     { emoji: '🎮', text: 'En jeu', isPremium: false },
     { emoji: '🚀', text: 'En mission', isPremium: true },
-    { emoji: '🦁', text: 'Roi de la jungle', isPremium: true },
-    { emoji: '💎', text: 'Rich life', isPremium: true },
     { emoji: '🔥', text: 'On fire', isPremium: true },
-    { emoji: '👾', text: 'Mode Gaming Ultimate', isPremium: true },
 ];
 
 export default function ProfilePage() {
@@ -39,7 +36,7 @@ export default function ProfilePage() {
   const [uploading, setUploading] = useState(false);
   const [user, setUser] = useState<any>(null);
 
-  // Profil
+  // Données Profil
   const [username, setUsername] = useState("");
   const [originalUsername, setOriginalUsername] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
@@ -52,12 +49,16 @@ export default function ProfilePage() {
   const [statusEmoji, setStatusEmoji] = useState("👋");
   const [isAdminUser, setIsAdminUser] = useState(false);
   
-  // Listes
+  // Bibliothèque & Collections
   const [animeCount, setAnimeCount] = useState(0);
   const [library, setLibrary] = useState<any[]>([]); 
   const [collection, setCollection] = useState<any[]>([]); 
-  const [filter, setFilter] = useState<'all' | 'anime' | 'manga'>('all');
+  
+  // FILTRES
+  const [typeFilter, setTypeFilter] = useState<'all' | 'anime' | 'manga'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'plan_to_watch' | 'completed'>('all');
 
+  // UI States
   const [showBannerSelector, setShowBannerSelector] = useState(false);
   const [showStatusSelector, setShowStatusSelector] = useState(false);
   const [isEditingUsername, setIsEditingUsername] = useState(false);
@@ -72,10 +73,13 @@ export default function ProfilePage() {
       setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       
-      if (!user) return;
+      if (!user) {
+          router.push('/auth');
+          return;
+      }
       setUser(user);
 
-      // 1. Library
+      // 1. Récupérer la bibliothèque
       const { data: libData, count: libCount } = await supabase
         .from('library')
         .select('*', { count: 'exact' })
@@ -85,17 +89,16 @@ export default function ProfilePage() {
       setAnimeCount(libCount || 0);
       setLibrary(libData || []);
 
-      // 2. Gacha
+      // 2. Récupérer le Gacha (si activé)
       if (ENABLE_GACHA) {
           const { data: myCards } = await supabase.from('user_characters').select('*, characters(*)').eq('user_id', user.id);
           setCollection(myCards || []);
       }
 
-      // 3. Profil
+      // 3. Récupérer le profil public
       const { data: fetchedData } = await supabase.from("profiles").select("*,is_admin").eq("id", user.id).maybeSingle();
       
       if (fetchedData) {
-        // Hydratation des données
         setUsername(fetchedData.username || "");
         setOriginalUsername(fetchedData.username || "");
         setNameColor(fetchedData.name_color || "#ffffff");
@@ -169,18 +172,12 @@ export default function ProfilePage() {
       setUploading(true);
       const file = event.target.files[0];
       const fileExt = file.name.split(".").pop();
-      
-      // ✅ CORRECTION : Nom de fichier FIXE pour éviter les doublons orphelins
-      // Ex: avatar_user123.jpg. Si on re-upload, ça écrase l'ancien.
       const fileName = `${bucket === 'avatars' ? 'avatar' : 'banner'}_${user.id}.${fileExt}`;
       
-      // On utilise upsert: true pour écraser
       const { error: uploadError } = await supabase.storage.from(bucket).upload(fileName, file, { upsert: true });
       if (uploadError) throw uploadError;
 
       const { data } = supabase.storage.from(bucket).getPublicUrl(fileName);
-      
-      // Cache busting pour forcer l'affichage de la nouvelle image
       const publicUrl = `${data.publicUrl}?t=${new Date().getTime()}`;
 
       if (bucket === 'avatars') {
@@ -188,15 +185,10 @@ export default function ProfilePage() {
           await supabase.from('profiles').update({ avatar_url: fileName }).eq('id', user.id);
       } else {
           setBannerUrl(publicUrl); 
-          // Pas besoin de save en base pour la banner si on update juste le state local ici avant le save global
-          // Mais si on veut que ce soit immédiat :
            await supabase.from('profiles').update({ banner_url: fileName }).eq('id', user.id);
       }
       toast.success("Image chargée !");
-    } catch (e) { 
-        console.error(e);
-        toast.error("Erreur upload"); 
-    } finally { setUploading(false); }
+    } catch (e) { console.error(e); toast.error("Erreur upload"); } finally { setUploading(false); }
   }
 
   const selectDefaultBanner = (b: any) => {
@@ -208,27 +200,35 @@ export default function ProfilePage() {
     setStatusEmoji(p.emoji); setStatusText(p.text); setShowStatusSelector(false);
   };
 
+  // --- LOGIQUE DE FILTRAGE ---
   const filteredLibrary = library.filter(item => {
-      if (filter === 'all') return true;
+      // 1. Filtre TYPE
       const itemType = item.type?.toLowerCase() || 'anime';
-      if (filter === 'anime') return itemType !== 'manga' && itemType !== 'novel';
-      if (filter === 'manga') return itemType === 'manga' || itemType === 'novel';
+      if (typeFilter === 'anime' && (itemType === 'manga' || itemType === 'novel')) return false;
+      if (typeFilter === 'manga' && itemType !== 'manga' && itemType !== 'novel') return false;
+
+      // 2. Filtre STATUT
+      if (statusFilter === 'plan_to_watch' && item.status !== 'plan_to_watch') return false;
+      if (statusFilter === 'completed' && item.status !== 'completed') return false;
+
       return true;
   });
 
-  if (loading) return <div className="pt-24 text-center text-white">Chargement...</div>;
+  if (loading) return <div className="pt-24 text-center text-white animate-pulse">Chargement du profil...</div>;
 
   return (
     <div className="min-h-screen pt-24 pb-10 px-4 max-w-4xl mx-auto flex flex-col gap-8">
       
-      {/* CARTE PROFIL */}
+      {/* --- CARTE PROFIL PRINCIPALE --- */}
       <div className="w-full bg-slate-900 rounded-xl overflow-hidden shadow-2xl border border-white/10 relative group">
+        
+        {/* BANNIÈRE */}
         <div className="h-60 w-full bg-slate-800 relative group/banner">
             {bannerUrl ? <Image src={bannerUrl} alt="Bannière" fill className="object-cover" unoptimized priority /> : <div className="w-full h-full bg-gradient-to-r from-slate-800 to-slate-900" />}
             <button onClick={() => { setShowBannerSelector(!showBannerSelector); setShowStatusSelector(false); }} className="absolute top-4 right-4 bg-black/60 hover:bg-black/80 text-white px-4 py-2 rounded-lg backdrop-blur border border-white/20 transition opacity-0 group-hover/banner:opacity-100 flex items-center gap-2 font-bold text-sm">📷 Modifier</button>
         </div>
 
-        {/* TIROIRS DE SELECTION */}
+        {/* SELECTEURS (Banner / Status) */}
         {showBannerSelector && (
             <div className="relative z-50 bg-slate-950 border-y border-white/10 p-6 animate-in slide-in-from-top-4 shadow-[0_20px_50px_rgba(0,0,0,0.9)]">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -252,7 +252,6 @@ export default function ProfilePage() {
                         <button key={idx} onClick={() => selectPresetStatus(preset)} className="group flex items-center gap-3 p-3 rounded-xl border border-white/10 hover:bg-slate-800 text-left">
                             <span className="text-2xl">{preset.emoji}</span>
                             <span className="text-sm font-medium text-gray-300">{preset.text}</span>
-                            {preset.isPremium && !isPremium && <span className="ml-auto text-xs">🔒</span>}
                         </button>
                     ))}
                 </div>
@@ -261,6 +260,7 @@ export default function ProfilePage() {
 
         <div className="px-6 pb-6 relative">
             <div className={`flex justify-between items-end mb-4 transition-all duration-300 ease-in-out ${(showBannerSelector || showStatusSelector) ? 'mt-4' : '-mt-16'}`}>
+                {/* AVATAR */}
                 <div className="relative w-32 h-32 rounded-full border-[6px] border-slate-900 bg-slate-800 shadow-lg group/avatar">
                     {avatarUrl ? <Image src={avatarUrl} alt="Avatar" fill className="object-cover rounded-full" unoptimized priority /> : <div className="w-full h-full flex items-center justify-center text-3xl font-bold text-white bg-slate-600 rounded-full">{username?.[0]?.toUpperCase()}</div>}
                     <label className="absolute inset-0 bg-black/60 flex items-center justify-center text-white opacity-0 group-hover/avatar:opacity-100 cursor-pointer rounded-full transition z-10"><span className="text-xs font-bold">EDIT</span><input type="file" className="hidden" accept="image/*" onChange={(e) => uploadCustomImage(e, 'avatars')} disabled={uploading} /></label>
@@ -281,20 +281,33 @@ export default function ProfilePage() {
                 
                 <hr className="border-white/10 my-4" />
 
-                {/* MA BIBLIOTHÈQUE */}
+                {/* --- MA BIBLIOTHÈQUE --- */}
                 <div className="mb-8">
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-xs font-bold text-gray-400 uppercase">Ma Bibliothèque ({library.length})</h3>
-                        <div className="flex bg-slate-900 p-1 rounded-lg border border-white/10">
-                            {(['all', 'anime', 'manga'] as const).map((f) => (
-                                <button
-                                    key={f}
-                                    onClick={() => setFilter(f)}
-                                    className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase transition ${filter === f ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`}
-                                >
-                                    {f === 'all' ? 'Tout' : f}
-                                </button>
-                            ))}
+                    <div className="flex flex-col md:flex-row items-center justify-between mb-6 gap-4">
+                        <h3 className="text-xs font-bold text-gray-400 uppercase">
+                            Ma Bibliothèque <span className="text-white">({filteredLibrary.length})</span>
+                        </h3>
+                        
+                        <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
+                            {/* Filtre TYPE */}
+                            <div className="flex bg-slate-900 p-1 rounded-lg border border-white/10">
+                                {(['all', 'anime', 'manga'] as const).map((f) => (
+                                    <button
+                                        key={f}
+                                        onClick={() => setTypeFilter(f)}
+                                        className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase transition ${typeFilter === f ? 'bg-indigo-600 text-white shadow' : 'text-gray-400 hover:text-white'}`}
+                                    >
+                                        {f === 'all' ? 'Tout' : f}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Filtre STATUT */}
+                            <div className="flex bg-slate-900 p-1 rounded-lg border border-white/10">
+                                <button onClick={() => setStatusFilter('all')} className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase transition ${statusFilter === 'all' ? 'bg-slate-600 text-white' : 'text-gray-400 hover:text-white'}`}>Tout</button>
+                                <button onClick={() => setStatusFilter('plan_to_watch')} className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase transition ${statusFilter === 'plan_to_watch' ? 'bg-indigo-500 text-white' : 'text-gray-400 hover:text-white'}`}>À voir</button>
+                                <button onClick={() => setStatusFilter('completed')} className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase transition ${statusFilter === 'completed' ? 'bg-green-600 text-white' : 'text-gray-400 hover:text-white'}`}>Terminé</button>
+                            </div>
                         </div>
                     </div>
                     
@@ -302,16 +315,24 @@ export default function ProfilePage() {
                         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-4">
                             {filteredLibrary.map((item: any) => {
                                 const isManga = item.type?.toLowerCase() === 'manga' || item.type?.toLowerCase() === 'novel';
-                                const targetLink = isManga ? `/manga/${item.id}` : `/anime/${item.id}`;
+                                const targetLink = isManga ? `/manga/${item.jikan_id}` : `/anime/${item.jikan_id}`;
                                 const icon = isManga ? '📖' : '📺';
+                                const statusBadge = item.status === 'completed' ? '✓ Terminé' : '⏰ À voir';
+                                const statusColor = item.status === 'completed' ? 'bg-green-600' : 'bg-indigo-600';
 
                                 return (
-                                    <Link href={targetLink} key={item.id} className="group relative aspect-[2/3] rounded-lg overflow-hidden border border-white/10 hover:border-white/30 transition shadow-lg bg-slate-900 block">
+                                    <Link href={targetLink} key={`${item.jikan_id}-${item.type}`} className="group relative aspect-[2/3] rounded-lg overflow-hidden border border-white/10 hover:border-white/30 transition shadow-lg bg-slate-900 block">
                                         {item.image_url ? (
                                             <Image src={item.image_url} alt={item.title} fill className="object-cover group-hover:scale-105 transition duration-500" unoptimized />
                                         ) : (
                                             <div className="w-full h-full bg-slate-800 flex items-center justify-center text-xs text-gray-500">Pas d'image</div>
                                         )}
+                                        
+                                        {/* Badge Statut */}
+                                        <div className={`absolute top-2 right-2 px-2 py-0.5 rounded text-[8px] font-bold text-white shadow-md ${statusColor}`}>
+                                            {statusBadge}
+                                        </div>
+
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition flex flex-col justify-end p-2">
                                             <p className="text-xs font-bold text-white leading-tight line-clamp-2">{item.title}</p>
                                             <div className="flex justify-between items-center mt-1">
@@ -319,20 +340,15 @@ export default function ProfilePage() {
                                                 <span className="text-xs">{icon}</span>
                                             </div>
                                         </div>
-                                        {item.status && (
-                                            <div className="absolute top-1 right-1 px-1.5 py-0.5 rounded text-[8px] font-bold bg-black/60 text-white backdrop-blur">
-                                                {item.status}
-                                            </div>
-                                        )}
                                     </Link>
                                 );
                             })}
                         </div>
                     ) : (
-                        <div className="text-center py-8 border border-dashed border-white/10 rounded-xl bg-slate-900/30">
-                            <p className="text-gray-500 text-sm mb-3">Aucun {filter === 'all' ? 'titre' : filter} trouvé.</p>
-                            <Link href="/" className="text-indigo-400 hover:text-indigo-300 text-sm font-bold bg-indigo-500/10 px-4 py-2 rounded-full border border-indigo-500/20 hover:bg-indigo-500/20 transition">
-                                + Explorer
+                        <div className="text-center py-12 border border-dashed border-white/10 rounded-xl bg-slate-900/30 flex flex-col items-center">
+                            <p className="text-gray-500 text-sm mb-4">Aucun titre ne correspond à ces filtres.</p>
+                            <Link href="/" className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-full font-bold transition text-sm">
+                                + Explorer le catalogue
                             </Link>
                         </div>
                     )}
@@ -364,7 +380,7 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* FORMULAIRES EDITION */}
+      {/* --- FORMULAIRES D'ÉDITION --- */}
       <div className="grid md:grid-cols-2 gap-6 opacity-90 hover:opacity-100 transition">
         <div className="bg-slate-900 border border-white/10 p-6 rounded-xl space-y-4">
             <h3 className="text-lg font-bold text-white mb-4">Identité</h3>

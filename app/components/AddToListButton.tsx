@@ -4,26 +4,25 @@ import { createClient } from "../lib/supabase";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-// On ajoute userId dans les props pour éviter de le refetcher 50 fois sur la page d'accueil
 interface AddButtonProps {
     anime: any;
     mediaType?: "anime" | "manga";
     userId?: string;
+    compact?: boolean; // Option pour affichage compact (sur les cartes) vs complet (sur la page détail)
 }
 
-export default function AddToListButton({ anime, mediaType = "anime", userId }: AddButtonProps) {
+type ListStatus = "plan_to_watch" | "completed" | null;
+
+export default function AddToListButton({ anime, mediaType = "anime", userId, compact = true }: AddButtonProps) {
   const [loading, setLoading] = useState(true);
-  const [isAdded, setIsAdded] = useState(false);
+  const [status, setStatus] = useState<ListStatus>(null);
   
   const supabase = createClient();
   const router = useRouter();
 
   useEffect(() => {
     const checkStatus = async () => {
-      // Si on a déjà l'ID via les props (depuis Home), on l'utilise directement
       let currentUserId = userId;
-
-      // Sinon, on le cherche (cas de la page détail)
       if (!currentUserId) {
           const { data: { user } } = await supabase.auth.getUser();
           currentUserId = user?.id;
@@ -33,25 +32,22 @@ export default function AddToListButton({ anime, mediaType = "anime", userId }: 
 
       const { data } = await supabase
         .from("library")
-        .select("id")
+        .select("status")
         .eq("user_id", currentUserId)
         .eq("jikan_id", anime.mal_id)
         .eq("type", mediaType)
         .maybeSingle();
 
-      if (data) setIsAdded(true);
+      if (data) setStatus(data.status as ListStatus);
       setLoading(false);
     };
     checkStatus();
   }, [anime.mal_id, mediaType, supabase, userId]);
 
-  const handleToggle = async (e: React.MouseEvent) => {
-    e.preventDefault(); // Empêche le clic de déclencher le lien de la carte parente
-    e.stopPropagation();
-
+  const handleUpdate = async (e: React.MouseEvent, newStatus: ListStatus) => {
+    e.preventDefault(); e.stopPropagation();
     setLoading(true);
-    
-    // Récupération de l'user (prop ou fetch)
+
     let currentUserId = userId;
     if (!currentUserId) {
         const { data: { user } } = await supabase.auth.getUser();
@@ -59,73 +55,88 @@ export default function AddToListButton({ anime, mediaType = "anime", userId }: 
     }
 
     if (!currentUserId) {
-      toast.error("Connecte-toi pour gérer ta liste !", {
-          action: { label: "Connexion", onClick: () => router.push("/auth") }
-      });
+      toast.error("Connecte-toi d'abord !");
       setLoading(false);
       return;
     }
 
-    if (isAdded) {
+    if (newStatus === null) {
       // SUPPRESSION
-      const { error } = await supabase
-        .from("library")
-        .delete()
-        .eq("user_id", currentUserId)
-        .eq("jikan_id", anime.mal_id)
-        .eq("type", mediaType);
-
-      if (!error) {
-        setIsAdded(false);
-        toast.info("Retiré de ta bibliothèque");
-      } else {
-        toast.error("Erreur suppression");
-      }
+      await supabase.from("library").delete().eq("user_id", currentUserId).eq("jikan_id", anime.mal_id).eq("type", mediaType);
+      setStatus(null);
+      toast.info("Retiré de ta liste");
     } else {
-      // AJOUT
+      // AJOUT / MODIFICATION
       const imageUrl = anime.images?.jpg?.large_image_url || anime.images?.jpg?.image_url;
-
       const { error } = await supabase.from("library").upsert({
         user_id: currentUserId,
         jikan_id: anime.mal_id,
         title: anime.title,
         image_url: imageUrl,
-        status: "plan_to_watch",
+        status: newStatus, // 'plan_to_watch' ou 'completed'
         score: 0,
         type: mediaType
-      }, 
-      { onConflict: 'user_id, jikan_id, type' }); 
+      }, { onConflict: 'user_id, jikan_id, type' });
 
       if (!error) {
-        setIsAdded(true);
-        toast.success(`Ajouté à ta liste !`);
+        setStatus(newStatus);
+        toast.success(newStatus === 'plan_to_watch' ? "Ajouté à 'À voir plus tard'" : "Marqué comme 'Terminé' !");
       } else {
-        toast.error("Erreur ajout");
+        toast.error("Erreur...");
       }
     }
     setLoading(false);
     router.refresh();
   };
 
-  // Version "Mini" pour les cartes (juste l'icône)
+  // --- RENDU COMPACT (Pour les cartes) ---
+  // Affiche juste un "+" ou l'icône du statut actuel
+  if (compact) {
+      return (
+        <button
+          onClick={(e) => handleUpdate(e, status ? null : 'plan_to_watch')} // Par défaut, compact ajoute en "À voir"
+          disabled={loading}
+          className={`shadow-xl rounded-full w-10 h-10 flex items-center justify-center transition-all duration-200 ${
+            status === 'completed' ? "bg-green-600 text-white" :
+            status === 'plan_to_watch' ? "bg-indigo-600 text-white" :
+            "bg-white text-black hover:bg-gray-200"
+          } ${loading ? "opacity-50" : "hover:scale-110"}`}
+          title={status ? "Retirer" : "À regarder plus tard"}
+        >
+          {loading ? <span className="animate-spin text-xs">⌛</span> : 
+           status === 'completed' ? <span>✓</span> :
+           status === 'plan_to_watch' ? <span>👀</span> : 
+           <span>➕</span>}
+        </button>
+      );
+  }
+
+  // --- RENDU COMPLET (Pour la page détail) ---
   return (
-    <button
-      onClick={handleToggle}
-      disabled={loading}
-      className={`shadow-xl rounded-full w-10 h-10 flex items-center justify-center transition-all duration-200 ${
-        isAdded 
-            ? "bg-red-500 hover:bg-red-600 text-white" 
-            : "bg-indigo-600 hover:bg-indigo-700 text-white"
-      } ${loading ? "opacity-50 cursor-wait" : "hover:scale-110"}`}
-      title={isAdded ? "Retirer" : "Ajouter"}
-    >
-      {loading ? (
-          <span className="animate-spin text-xs">⌛</span>
-      ) : isAdded ? (
-          <span>🗑️</span> 
-      ) : (
-          <span>➕</span>
-      )}
-    </button>
+    <div className="flex flex-col gap-2 w-full">
+        {/* Bouton "À voir plus tard" */}
+        <button
+            onClick={(e) => handleUpdate(e, status === 'plan_to_watch' ? null : 'plan_to_watch')}
+            className={`w-full py-3 px-4 rounded-lg flex items-center justify-center gap-2 font-bold transition border ${
+                status === 'plan_to_watch' 
+                ? "bg-indigo-600 border-indigo-500 text-white shadow-[0_0_15px_rgba(79,70,229,0.5)]" 
+                : "bg-indigo-900/30 border-indigo-500/30 text-indigo-200 hover:bg-indigo-900/50 hover:border-indigo-400"
+            }`}
+        >
+            <span>{status === 'plan_to_watch' ? "Retirer de 'À voir'" : "⏰ À regarder plus tard"}</span>
+        </button>
+
+        {/* Bouton "Terminé" */}
+        <button
+            onClick={(e) => handleUpdate(e, status === 'completed' ? null : 'completed')}
+            className={`w-full py-2 px-4 rounded-lg flex items-center justify-center gap-2 font-bold text-sm transition border ${
+                status === 'completed' 
+                ? "bg-green-600 border-green-500 text-white shadow-[0_0_15px_rgba(22,163,74,0.5)]" 
+                : "bg-green-900/30 border-green-500/30 text-green-200 hover:bg-green-900/50 hover:border-green-400"
+            }`}
+        >
+            <span>{status === 'completed' ? "✓ Déjà vu (Retirer)" : "✓ Marquer comme vu"}</span>
+        </button>
+    </div>
   );
 }
