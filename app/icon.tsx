@@ -1,37 +1,54 @@
 import { ImageResponse } from 'next/og'
 
-// Route segment config
+// Configuration de la route
 export const runtime = 'edge'
 
-// Image metadata
+// Taille standard recommandée pour un favicon polyvalent
 export const size = {
-  width: 32,
-  height: 32,
+  width: 48,
+  height: 48,
 }
 export const contentType = 'image/png'
 
-// Image generation
+// Génération de l'image
 export default function Icon() {
   return new ImageResponse(
     (
-      // ImageResponse JSX element
+      // Conteneur principal (le carré arrondi)
       <div
         style={{
-          fontSize: 24,
-          background: 'black',
           width: '100%',
           height: '100%',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          color: 'white',
-          borderRadius: '20%', // Un carré légèrement arrondi
+          // Fond dégradé style "anime dark"
+          background: 'linear-gradient(135deg, #1e1b4b 0%, #4c1d95 100%)',
+          borderRadius: '25%', // Arrondi moderne
+          border: '2px solid rgba(255,255,255,0.1)',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.5)',
         }}
       >
-        🇫🇷
+        {/* Conteneur du texte pour l'effet d'ombre portée */}
+        <div
+          style={{
+            display: 'flex',
+            fontSize: 28, // Taille ajustée pour 48x48
+            fontWeight: 900, // Très gras
+            fontStyle: 'italic', // Dynamique
+            fontFamily: 'sans-serif',
+            // Ombre portée solide style "manga"
+            textShadow: '2px 2px 0px #000',
+          }}
+        >
+          {/* Les lettres aux couleurs de la France */}
+          <span style={{ color: '#3b82f6' }}>M</span> {/* Bleu */}
+          <span style={{ color: '#ffffff' }}>F</span> {/* Blanc */}
+          <span style={{ color: '#ef4444' }}>L</span> {/* Rouge */}
+        </div>
       </div>
     ),
-    // ImageResponse options
+    // Options ImageResponse
     {
       ...size,
     }
