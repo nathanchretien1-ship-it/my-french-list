@@ -1,4 +1,3 @@
-// next.config.ts
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
@@ -6,15 +5,20 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'lh3.googleusercontent.com', // Pour Google Auth
+        hostname: 'lh3.googleusercontent.com', // Avatar Google
       },
       {
         protocol: 'https',
-        hostname: 'cdn.myanimelist.net', // Pour Jikan API
+        hostname: 'cdn.myanimelist.net', // Images Jikan API
       },
       {
         protocol: 'https',
-        hostname: '**.supabase.co', // Pour ton stockage Supabase
+        hostname: 'images.unsplash.com', // Bannières par défaut
+      },
+      // Ajoute ici ton domaine Supabase si tu stockes des avatars customs
+      {
+        protocol: 'https',
+        hostname: '**.supabase.co', 
       }
     ],
   },

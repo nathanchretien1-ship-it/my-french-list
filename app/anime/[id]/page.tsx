@@ -2,7 +2,22 @@ import { getAnimeById } from "../../lib/api";
 import Image from "next/image";
 import AddToListButton from "../../components/AddToListButton";
 import { createClient } from "../../lib/supabase/server"; 
+import { Metadata } from 'next';
 
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const anime = await getAnimeById(id); // Ta fonction API
+  
+  if (!anime) return { title: 'Anime Introuvable' };
+
+  return {
+    title: `${anime.title} - MyFrenchList`,
+    description: anime.synopsis?.slice(0, 150) + "...",
+    openGraph: {
+      images: [anime.images?.jpg?.large_image_url], // Belle image quand on partage sur Discord/Twitter
+    }
+  };
+}
 // Composant utilitaire pour afficher une ligne d'info
 const InfoRow = ({ label, value }: { label: string, value: string | number | null | undefined }) => {
     if (!value) return null;
