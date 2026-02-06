@@ -4,7 +4,7 @@ const BASE_URL = "https://api.jikan.moe/v4";
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
-// ✅ Traduction plus robuste (insensible à la casse)
+// ✅ Traduction plus robuste
 export function translateStatus(status: string): string {
   if (!status) return "Inconnu";
   const s = status.toLowerCase().trim();
@@ -16,7 +16,7 @@ export function translateStatus(status: string): string {
   if (s === "on hiatus") return "En pause";
   if (s === "discontinued") return "Abandonné";
   
-  return status; // Retourne l'original si pas de match
+  return status; 
 }
 
 async function fetchWithCache(endpoint: string, revalidateTime: number) {
@@ -39,19 +39,16 @@ async function fetchWithCache(endpoint: string, revalidateTime: number) {
   } catch (error) { return null; }
 }
 
-// ✅ Fonction générique pour récupérer Top Anime OU Manga avec filtres
+// ✅ Fonction générique pour récupérer Top Anime OU Manga
 export async function getTopContent(type: 'anime' | 'manga', page = 1, filter: 'airing' | 'score' | 'bypopularity' = 'bypopularity') {
   let queryParams = `page=${page}&limit=24&sfw=true`;
 
   if (filter === 'airing') {
-      // "Tendances"
       if (type === 'anime') queryParams += '&filter=airing';
-      else queryParams += '&filter=publishing'; // Pour les mangas, c'est 'publishing'
+      else queryParams += '&filter=publishing'; 
   } else if (filter === 'score') {
-      // "Légendes"
       queryParams += '&order_by=score&sort=desc';
   } else {
-      // "Populaire" (Défaut)
       queryParams += '&order_by=members&sort=desc';
   }
 
@@ -67,13 +64,49 @@ export async function getTopContent(type: 'anime' | 'manga', page = 1, filter: '
   return [];
 }
 
-// --- Wrappers pour compatibilité existante ---
-export async function getTopAnime(page = 1, filter: 'airing' | 'score' | 'bypopularity' = 'bypopularity') {
-    return getTopContent('anime', page, filter);
-}
+// ✨ NOUVELLE FONCTION DE RECHERCHE AVANCÉE ✨
+export async function getAdvancedContent(
+  type: 'anime' | 'manga', 
+  page = 1, 
+  filters: {
+    status?: string;
+    format?: string;
+    sort?: string;
+  }
+) {
+  // On utilise l'endpoint de recherche (/anime ou /manga) qui supporte plus de filtres
+  let queryParams = `page=${page}&limit=24&sfw=true`;
 
-export async function getTopManga(page = 1, filter: 'airing' | 'score' | 'bypopularity' = 'bypopularity') {
-    return getTopContent('manga', page, filter);
+  // 1. Gestion du Statut
+  if (filters.status && filters.status !== 'all') {
+      queryParams += `&status=${filters.status}`;
+  }
+
+  // 2. Gestion du Format (TV, Movie, etc.)
+  if (filters.format && filters.format !== 'all') {
+      queryParams += `&type=${filters.format}`;
+  }
+
+  // 3. Gestion du Tri (Score, Popularité, Date)
+  if (filters.sort === 'score') {
+      queryParams += '&order_by=score&sort=desc';
+  } else if (filters.sort === 'newest') {
+      queryParams += '&order_by=start_date&sort=desc';
+  } else {
+      // Par défaut : Popularité (members)
+      queryParams += '&order_by=members&sort=desc';
+  }
+
+  const endpoint = type === 'anime' ? '/anime' : '/manga';
+  const data = await fetchWithCache(`${endpoint}?${queryParams}`, 3600);
+  
+  if (data) {
+      return data.map((item: any) => ({
+          ...item,
+          status: translateStatus(item.status)
+      }));
+  }
+  return [];
 }
 
 export async function getAnimeById(id: string) {
@@ -92,7 +125,6 @@ export async function getMangaById(id: string) {
   return data;
 }
 
-// ... (Garde searchAnime, getSeasonNow, etc. comme avant)
 export async function searchAnime(query: string) {
   const data = await fetchWithCache(`/anime?q=${encodeURIComponent(query)}&sfw=true&limit=10`, 300);
   return data || [];
@@ -116,24 +148,10 @@ export async function getAnimeByYear(year: number) {
 }
 export async function getRecommendations(genres: number[], type: 'anime' | 'manga' = 'anime', excludeId: number) {
   if (!genres || genres.length === 0) return [];
-  
-  // On prend les 3 premiers genres pour ne pas être trop restrictif
   const genresString = genres.slice(0, 3).join(',');
-  
-  // On cherche par genre, trié par popularité
   const endpoint = type === 'anime' ? '/anime' : '/manga';
   const url = `${endpoint}?genres=${genresString}&order_by=members&sort=desc&limit=6&sfw=true`;
-  
-  const data = await fetchWithCache(url, 3600); // Cache 1h
-  
+  const data = await fetchWithCache(url, 3600); 
   if (!data) return [];
-  
-  // On exclut l'œuvre actuelle et on traduit le statut
-  return data
-    .filter((item: any) => item.mal_id !== excludeId)
-    .slice(0, 5) // Garde les 5 meilleurs
-    .map((item: any) => ({
-        ...item,
-        status: translateStatus(item.status)
-    }));
+  return data.filter((item: any) => item.mal_id !== excludeId).slice(0, 5).map((item: any) => ({ ...item, status: translateStatus(item.status) }));
 }
