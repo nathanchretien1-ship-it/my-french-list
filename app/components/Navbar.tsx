@@ -186,9 +186,10 @@ export default function Navbar({ user: initialUser }: NavbarProps) {
                         src={avatarUrl} 
                         alt="Avatar" 
                         fill 
-                        referrerPolicy="no-referrer" // 👈 Ajoute ça
+                        referrerPolicy="no-referrer"
                         className="object-cover" 
-                        unoptimized // Important pour les images externes (Google) si non configurées dans next.config
+                        sizes="32px"
+                        priority
                       />
                     ) : (
                       <div className="h-full w-full bg-purple-600 flex items-center justify-center text-xs font-bold text-white">

@@ -3,6 +3,7 @@ import { useState } from "react";
 import AnimeCard from "./AnimeCard";
 import { fetchAdvancedMediaList } from "../action"; 
 import { User } from "@supabase/supabase-js";
+import { toast } from "sonner";
 
 interface HomeGridProps {
   initialData: any[];
@@ -54,7 +55,7 @@ export default function HomeGrid({ initialData, user }: HomeGridProps) {
     
     // ✅ FIX 2 : Déduplication sur les résultats de filtre
     const uniqueData = new Map();
-    (data || []).forEach((item: any) => uniqueData.set(item.mal_id, item));
+    (data || []).data.forEach((item: any) => uniqueData.set(item.mal_id, item));
     setItems(Array.from(uniqueData.values()));
     
     setLoading(false);
@@ -69,11 +70,10 @@ export default function HomeGrid({ initialData, user }: HomeGridProps) {
         format: format
     });
     
-    if (newItems && newItems.length > 0) {
+    if (newItems.data && newItems.data.length > 0) {
         setItems(prev => {
-            // ✅ FIX 3 : Déduplication robuste pour la pagination
-            // On combine l'ancien et le nouveau, et le Map élimine les IDs en double
-            const combined = [...prev, ...newItems];
+            
+            const combined = [...prev, ...newItems.data];
             const uniqueMap = new Map();
             combined.forEach(item => uniqueMap.set(item.mal_id, item));
             return Array.from(uniqueMap.values());

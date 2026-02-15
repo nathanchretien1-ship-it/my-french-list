@@ -35,7 +35,7 @@ export default function SearchPage() {
       });
       // Déduplication
       const uniqueData = new Map();
-      (data || []).forEach((item: any) => uniqueData.set(item.mal_id, item));
+      (data || []).data.forEach((item: any) => uniqueData.set(item.mal_id, item));
       setItems(Array.from(uniqueData.values()));
       setLoading(false);
   };

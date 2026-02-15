@@ -1,5 +1,5 @@
 import { translate } from 'google-translate-api-x';
-
+import { JikanEntry } from "../types/jikan"; // Importez vos types
 const BASE_URL = "https://api.jikan.moe/v4";
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -31,12 +31,25 @@ async function fetchWithCache(endpoint: string, revalidateTime: number) {
     });
     clearTimeout(timeoutId);
 
-    if (response.status === 429) { await delay(1000); return null; }
-    if (!response.ok) return null;
+    if (response.status === 429) { 
+      console.warn("Rate limit Jikan atteint");
+      await delay(1000); 
+      return null; 
+    }
+    
+    if (!response.ok) {
+      console.error(`Erreur API Jikan: ${response.status} sur ${endpoint}`);
+      return null;
+    }
     
     const json = await response.json();
     return json.data;
-  } catch (error) { return null; }
+  } catch (error) { 
+    if (error instanceof Error && error.name === 'AbortError') {
+      console.error("La requête API a expiré (timeout)");
+    }
+    return null; 
+  }
 }
 
 // ✅ Fonction générique pour récupérer Top Anime OU Manga avec filtres
@@ -59,7 +72,7 @@ export async function getTopContent(type: 'anime' | 'manga', page = 1, filter: '
   const data = await fetchWithCache(`${endpoint}?${queryParams}`, 3600);
   
   if (data) {
-      return data.map((item: any) => ({
+      return data.map((item: JikanEntry) => ({
           ...item,
           status: translateStatus(item.status)
       }));

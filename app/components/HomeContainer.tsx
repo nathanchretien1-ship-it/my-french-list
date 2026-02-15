@@ -10,7 +10,7 @@ interface HomeContainerProps {
 }
 
 export default function HomeContainer({ initialData, user }: HomeContainerProps) {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
     <div className="flex flex-col lg:flex-row gap-6">

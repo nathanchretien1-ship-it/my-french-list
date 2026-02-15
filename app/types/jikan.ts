@@ -17,5 +17,4 @@ export interface JikanEntry {
   status: string;
   score: number;
   genres: { name: string }[];
-  // ... etc
 }
