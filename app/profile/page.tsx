@@ -7,6 +7,7 @@ import ProfileStats from "../components/ProfileStats";
 import AutoSyncGenres from "../components/AutoSyncGenres"; 
 import AchievementsList from "../components/AchievementsList"; // ✅ Import des succès
 import { getRank } from "../lib/ranks";
+import MALImportModule from "../components/MALImportModule";
 
 export default async function ProfilePage() {
   const supabase = await createClient();
@@ -119,7 +120,9 @@ export default async function ProfilePage() {
                 <AchievementsList library={items} />
             </div>
         </div>
-
+        <div className="mt-8">
+             <MALImportModule />
+        </div>
         {/* MA COLLECTION */}
         <div className="space-y-6 pt-4">
             <h2 className="text-2xl font-bold text-white border-l-4 border-indigo-500 pl-4">Ma Collection</h2>

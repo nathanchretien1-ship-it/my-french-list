@@ -10,7 +10,6 @@ interface AutoSyncProps {
 
 export default function AutoSyncGenres({ items, userId }: AutoSyncProps) {
   const router = useRouter();
-  // useRef empêche le useEffect de s'exécuter plusieurs fois (comportement strict mode React)
   const hasRun = useRef(false);
 
   useEffect(() => {
@@ -21,17 +20,27 @@ export default function AutoSyncGenres({ items, userId }: AutoSyncProps) {
     const missing = items.filter(i => !i.genres);
     if (missing.length === 0) return; // Si tout est à jour, on ne fait rien
 
+    // 💥 CORRECTION : On ne traite que 5 animes par chargement de page !
+    // Cela crée un effet "goutte à goutte" qui respecte l'API Jikan à la perfection.
+    const batch = missing.slice(0, 5);
+
     const syncMissingGenres = async () => {
       const supabase = createClient();
       let updated = false;
 
-      // On boucle sur les éléments manquants
-      for (const item of missing) {
+      for (const item of batch) {
         try {
-          // Pause de 500ms obligatoire pour ne pas se faire bloquer par l'API Jikan (rate limit)
-          await new Promise(resolve => setTimeout(resolve, 500));
+          // Pause de 1200ms obligatoire pour Jikan (Max 60 req/min, donc 1 par seconde)
+          await new Promise(resolve => setTimeout(resolve, 1200));
           
           const res = await fetch(`https://api.jikan.moe/v4/${item.type}/${item.jikan_id}`);
+          
+          // Si l'API nous dit STOP (429), on coupe la boucle proprement pour cette fois
+          if (res.status === 429) {
+              console.warn("Jikan Rate Limit atteint. La synchro reprendra à la prochaine visite.");
+              break; 
+          }
+
           if (res.ok) {
             const json = await res.json();
             if (json.data && json.data.genres) {
@@ -50,8 +59,7 @@ export default function AutoSyncGenres({ items, userId }: AutoSyncProps) {
         }
       }
 
-      // Si on a corrigé au moins un élément, on demande à Next.js de rafraîchir les données de la page 
-      // (Cela mettra à jour le graphique sans recharger la page pour l'utilisateur)
+      // Si on a corrigé au moins un élément, on rafraîchit les graphiques de la page
       if (updated) {
         router.refresh();
       }
@@ -62,6 +70,5 @@ export default function AutoSyncGenres({ items, userId }: AutoSyncProps) {
 
   }, [items, userId, router]);
 
-  // Ce composant ne retourne rien, il est 100% invisible sur la page
   return null;
 }
