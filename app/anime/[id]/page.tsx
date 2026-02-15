@@ -1,13 +1,12 @@
 import { getAnimeById, getRecommendations } from "../../lib/api";
 import Image from "next/image";
-import Link from "next/link"; // ✅ N'oublie pas d'importer Link
+import Link from "next/link"; 
 import AddToListButton from "../../components/AddToListButton";
 import RatingComponent from "../../components/RatingComponent";
 import AnimeCard from "../../components/AnimeCard";
 import { createClient } from "../../lib/supabase/server";
 import { Metadata } from "next";
 
-// ... (Garde le composant InfoRow tel quel) ...
 const InfoRow = ({ label, value }: { label: string, value: string | number | null | undefined }) => {
     if (!value) return null;
     return (
@@ -17,9 +16,17 @@ const InfoRow = ({ label, value }: { label: string, value: string | number | nul
         </div>
     );
 };
-export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
-  const anime = await getAnimeById(params.id);
+
+// ✅ CORRECTION ICI : params doit être une Promise dans Next.js 15+
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params; // On attend la Promise
+  
+  if (!id) return { title: "Anime non trouvé" };
+  
+  const anime = await getAnimeById(id);
+  
   if (!anime) return { title: "Anime non trouvé" };
+  
   return {
     title: `${anime.title} - MyFrenchList`,
     description: anime.synopsis?.slice(0, 160),
@@ -28,6 +35,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
     },
   };
 }
+
 export default async function AnimePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   
@@ -40,13 +48,11 @@ export default async function AnimePage({ params }: { params: Promise<{ id: stri
   const genreIds = anime.genres?.map((g: any) => g.mal_id) || [];
   const recommendations = await getRecommendations(genreIds, 'anime', anime.mal_id);
 
-  // --- 1. EXTRACTION DES RELATIONS ---
   const relations = anime.relations || [];
   const prequels = relations.find((r: any) => r.relation === 'Prequel')?.entry || [];
   const sequels = relations.find((r: any) => r.relation === 'Sequel')?.entry || [];
   const otherSeasons = relations.find((r: any) => r.relation === 'Side story' || r.relation === 'Spin-off')?.entry || [];
 
-  // Formatage
   const studios = anime.studios?.map((s: any) => s.name).join(", ");
   const producers = anime.producers?.map((p: any) => p.name).join(", ");
   const genres = anime.genres?.map((g: any) => g.name).join(", ");
@@ -55,7 +61,6 @@ export default async function AnimePage({ params }: { params: Promise<{ id: stri
   return (
     <div className="min-h-screen bg-[#0f111a] text-white pb-20">
       
-      {/* ... (HEADER BANNER reste identique) ... */}
       <div className="relative h-[50vh] w-full overflow-hidden">
         <div className="absolute inset-0 opacity-40 blur-xl scale-110">
            {anime.images?.jpg?.large_image_url && (
@@ -72,7 +77,6 @@ export default async function AnimePage({ params }: { params: Promise<{ id: stri
                  <p className="text-lg md:text-xl text-gray-300 italic font-light">{anime.title_japanese}</p>
              </div>
              
-             {/* ... (Badges Score/Rang/Popu restent identiques) ... */}
              <div className="flex gap-4">
                  <div className="flex flex-col items-center bg-black/40 backdrop-blur-md px-4 py-2 rounded-xl border border-white/10">
                      <span className="text-xs text-gray-400 uppercase font-bold">Score</span>
@@ -94,17 +98,14 @@ export default async function AnimePage({ params }: { params: Promise<{ id: stri
       <div className="max-w-7xl mx-auto px-4 sm:px-6 relative -mt-16 z-20">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           
-          {/* --- COLONNE GAUCHE --- */}
           <div className="lg:col-span-1 flex flex-col gap-6">
             
-            {/* Affiche */}
             <div className="relative aspect-[2/3] w-full rounded-xl overflow-hidden shadow-2xl border-4 border-[#1e293b] bg-gray-800">
               {anime.images?.jpg?.large_image_url && (
                 <Image src={anime.images.jpg.large_image_url} alt={anime.title} fill className="object-cover" loading="lazy" unoptimized />
               )}
             </div>
             
-            {/* Actions */}
             {user ? (
                 <div className="flex flex-col gap-4">
                     <AddToListButton anime={anime} mediaType="anime" userId={user.id} compact={false} />
@@ -122,7 +123,6 @@ export default async function AnimePage({ params }: { params: Promise<{ id: stri
                 </div>
             )}
 
-            {/* SIDEBAR INFOS */}
             <div className="bg-[#1e293b]/50 p-5 rounded-xl border border-white/5 backdrop-blur-sm">
                 <h3 className="text-white font-bold mb-4 uppercase text-sm border-b border-white/10 pb-2">Informations</h3>
                 <div className="flex flex-col gap-1">
@@ -138,7 +138,6 @@ export default async function AnimePage({ params }: { params: Promise<{ id: stri
                 </div>
             </div>
 
-            {/* --- 2. NOUVEAU BLOC : CHRONOLOGIE / RELATIONS --- */}
             {(prequels.length > 0 || sequels.length > 0) && (
                 <div className="bg-[#1e293b]/50 p-5 rounded-xl border border-white/5 backdrop-blur-sm">
                     <h3 className="text-white font-bold mb-4 uppercase text-sm border-b border-white/10 pb-2 flex items-center gap-2">
@@ -146,7 +145,6 @@ export default async function AnimePage({ params }: { params: Promise<{ id: stri
                     </h3>
                     <div className="flex flex-col gap-4">
                         
-                        {/* Préquelles */}
                         {prequels.length > 0 && (
                             <div>
                                 <span className="text-xs font-bold text-gray-500 uppercase block mb-2">Précédemment</span>
@@ -165,7 +163,6 @@ export default async function AnimePage({ params }: { params: Promise<{ id: stri
                             </div>
                         )}
 
-                        {/* Séquelles */}
                         {sequels.length > 0 && (
                             <div>
                                 <span className="text-xs font-bold text-gray-500 uppercase block mb-2">La suite</span>
@@ -187,7 +184,6 @@ export default async function AnimePage({ params }: { params: Promise<{ id: stri
                 </div>
             )}
              
-             {/* Liens Externes */}
              <div className="flex flex-wrap gap-2">
                  {anime.external?.map((link: any, i: number) => (
                      <a key={`${link.name}-${i}`} href={link.url} target="_blank" rel="noopener noreferrer" className="text-xs bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-full border border-white/10 transition">
@@ -197,11 +193,7 @@ export default async function AnimePage({ params }: { params: Promise<{ id: stri
              </div>
           </div>
 
-          {/* --- COLONNE DROITE (Contenu Principal) reste identique --- */}
           <div className="lg:col-span-3 flex flex-col gap-8 pt-4 lg:pt-0">
-                {/* ... (Tout le contenu Synopsis, Trailer, Staff, Musiques, Recommandations) ... */}
-                
-                {/* Je te remets le code de la colonne droite pour être sûr, mais rien ne change ici */}
                 <section>
                     <h2 className="text-2xl font-bold mb-4 flex items-center gap-2"><span className="w-1 h-6 bg-indigo-500 rounded-full"></span>Synopsis</h2>
                     <div className="bg-[#1e293b]/30 p-6 rounded-2xl border border-white/5 text-gray-300 leading-relaxed text-base">

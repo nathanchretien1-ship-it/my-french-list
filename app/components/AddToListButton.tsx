@@ -20,7 +20,6 @@ export default function AddToListButton({ anime, mediaType = "anime", userId, co
   const supabase = createClient();
   const router = useRouter();
 
-  // Textes dynamiques
   const textPlan = mediaType === 'manga' ? "À lire" : "À voir";
   const textCompleted = mediaType === 'manga' ? "Lu" : "Vu";
   const textFullPlan = mediaType === 'manga' ? "À lire plus tard" : "À regarder plus tard";
@@ -52,7 +51,7 @@ export default function AddToListButton({ anime, mediaType = "anime", userId, co
 
   const handleUpdate = async (e: React.MouseEvent, newStatus: ListStatus) => {
     e.preventDefault(); 
-    e.stopPropagation(); // Important pour ne pas ouvrir la page de l'anime au clic
+    e.stopPropagation(); 
     setLoading(true);
 
     let currentUserId = userId;
@@ -67,8 +66,6 @@ export default function AddToListButton({ anime, mediaType = "anime", userId, co
       return;
     }
 
-    // Si on clique sur le même statut, ça veut dire qu'on veut le retirer (toggle off)
-    // Sauf si c'est null (suppression explicite)
     if (newStatus === status) newStatus = null;
 
     if (newStatus === null) {
@@ -85,41 +82,41 @@ export default function AddToListButton({ anime, mediaType = "anime", userId, co
         title: anime.title,
         image_url: imageUrl,
         status: newStatus, 
-        type: mediaType
+        type: mediaType,
+        genres: anime.genres // ✅ MODIFICATION: On enregistre les genres pour les Stats de Profil
       }, { onConflict: 'user_id, jikan_id, type' });
 
       if (!error) {
         setStatus(newStatus);
         const actionText = newStatus === 'plan_to_watch' ? textFullPlan : textFullCompleted;
         toast.success(`Ajouté à : ${actionText}`);
-        if (newStatus) { // On n'enregistre pas les suppressions
-    const action = newStatus === 'completed' ? 'add_completed' : 'add_plan';
-    
-    // On ne bloque pas l'UI pour ça (pas de await bloquant)
-    supabase.from('activities').insert({
-        user_id: currentUserId,
-        media_id: anime.mal_id,
-        media_type: mediaType,
-        media_title: anime.title,
-        media_image: anime.images?.jpg?.large_image_url || anime.images?.jpg?.image_url,
-        action_type: action
-    }).then(({ error }) => {
-        if (error) console.error("Erreur activité", error);
-    });
-}
+        
+        if (newStatus) { 
+            const action = newStatus === 'completed' ? 'add_completed' : 'add_plan';
+            supabase.from('activities').insert({
+                user_id: currentUserId,
+                media_id: anime.mal_id,
+                media_type: mediaType,
+                media_title: anime.title,
+                media_image: imageUrl,
+                action_type: action
+            }).then(({ error }) => {
+                if (error) console.error("Erreur activité", error);
+            });
+        }
       } else {
-        toast.error("Erreur lors de la mise à jour");
+        console.error("Erreur upsert library", error);
+        toast.error("Erreur lors de la mise à jour (Vérifie que la colonne 'genres' existe en base de données)");
       }
     }
     setLoading(false);
     router.refresh();
   };
 
-  // --- 1. RENDU COMPACT (Sur les cartes : Menu au survol) ---
+  // --- 1. RENDU COMPACT ---
   if (compact) {
       return (
         <div className="relative group/menu">
-            {/* BOUTON PRINCIPAL (Icône actuelle) */}
             <button
                 className={`shadow-xl rounded-full w-10 h-10 flex items-center justify-center transition-all duration-200 border border-white/10 ${
                     status === 'completed' ? "bg-green-600 text-white" :
@@ -133,35 +130,16 @@ export default function AddToListButton({ anime, mediaType = "anime", userId, co
                 <span>➕</span>}
             </button>
 
-            {/* MENU DÉROULANT (Apparaît au survol du groupe) */}
             <div className="absolute top-0 left-0 pt-10 hidden group-hover/menu:block z-50">
                 <div className="flex flex-col gap-1 bg-slate-900 border border-white/10 p-1.5 rounded-lg shadow-xl -ml-1">
-                    
-                    {/* Option : À voir / lire */}
-                    <button
-                        onClick={(e) => handleUpdate(e, 'plan_to_watch')}
-                        className={`w-8 h-8 rounded-md flex items-center justify-center transition ${status === 'plan_to_watch' ? 'bg-indigo-600 text-white' : 'bg-white/5 hover:bg-indigo-600/50 text-gray-300'}`}
-                        title={textFullPlan}
-                    >
+                    <button onClick={(e) => handleUpdate(e, 'plan_to_watch')} className={`w-8 h-8 rounded-md flex items-center justify-center transition ${status === 'plan_to_watch' ? 'bg-indigo-600 text-white' : 'bg-white/5 hover:bg-indigo-600/50 text-gray-300'}`} title={textFullPlan}>
                         👀
                     </button>
-
-                    {/* Option : Terminé */}
-                    <button
-                        onClick={(e) => handleUpdate(e, 'completed')}
-                        className={`w-8 h-8 rounded-md flex items-center justify-center transition ${status === 'completed' ? 'bg-green-600 text-white' : 'bg-white/5 hover:bg-green-600/50 text-gray-300'}`}
-                        title={textFullCompleted}
-                    >
+                    <button onClick={(e) => handleUpdate(e, 'completed')} className={`w-8 h-8 rounded-md flex items-center justify-center transition ${status === 'completed' ? 'bg-green-600 text-white' : 'bg-white/5 hover:bg-green-600/50 text-gray-300'}`} title={textFullCompleted}>
                         ✓
                     </button>
-
-                    {/* Option : Supprimer (si déjà dans une liste) */}
                     {status && (
-                        <button
-                            onClick={(e) => handleUpdate(e, null)}
-                            className="w-8 h-8 rounded-md flex items-center justify-center bg-red-500/10 hover:bg-red-600 text-red-400 hover:text-white transition mt-1 border border-red-500/20"
-                            title="Retirer de la liste"
-                        >
+                        <button onClick={(e) => handleUpdate(e, null)} className="w-8 h-8 rounded-md flex items-center justify-center bg-red-500/10 hover:bg-red-600 text-red-400 hover:text-white transition mt-1 border border-red-500/20" title="Retirer de la liste">
                             🗑️
                         </button>
                     )}
@@ -171,7 +149,7 @@ export default function AddToListButton({ anime, mediaType = "anime", userId, co
       );
   }
 
-  // --- 2. RENDU COMPLET (Page détail : Gros boutons textes) ---
+  // --- 2. RENDU COMPLET ---
   return (
     <div className="flex flex-col gap-2 w-full">
         <button
@@ -183,11 +161,7 @@ export default function AddToListButton({ anime, mediaType = "anime", userId, co
                 : "bg-indigo-900/30 border-indigo-500/30 text-indigo-200 hover:bg-indigo-900/50 hover:border-indigo-400"
             }`}
         >
-            {loading ? <span className="animate-spin">⌛</span> : (
-                <>
-                   <span>{status === 'plan_to_watch' ? "Retirer de 'À voir'" : `⏰ ${textFullPlan}`}</span>
-                </>
-            )}
+            {loading ? <span className="animate-spin">⌛</span> : (<span>{status === 'plan_to_watch' ? "Retirer de 'À voir'" : `⏰ ${textFullPlan}`}</span>)}
         </button>
 
         <button
@@ -199,11 +173,7 @@ export default function AddToListButton({ anime, mediaType = "anime", userId, co
                 : "bg-green-900/30 border-green-500/30 text-green-200 hover:bg-green-900/50 hover:border-green-400"
             }`}
         >
-            {loading ? <span className="animate-spin">⌛</span> : (
-                <>
-                   <span>{status === 'completed' ? `✓ ${textFullCompleted} (Retirer)` : `✓ Marquer comme ${textCompleted}`}</span>
-                </>
-            )}
+            {loading ? <span className="animate-spin">⌛</span> : (<span>{status === 'completed' ? `✓ ${textFullCompleted} (Retirer)` : `✓ Marquer comme ${textCompleted}`}</span>)}
         </button>
     </div>
   );

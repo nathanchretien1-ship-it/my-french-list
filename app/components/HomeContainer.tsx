@@ -15,21 +15,14 @@ export default function HomeContainer({ initialData, user }: HomeContainerProps)
   return (
     <div className="flex flex-col lg:flex-row gap-6">
         
-        {/* Sidebar Desktop */}
-        <aside 
-            className={`hidden lg:block flex-shrink-0 transition-all duration-500 ease-in-out overflow-hidden ${
-                isSidebarOpen ? 'w-64 opacity-100' : 'w-0 opacity-0'
-            }`}
-        >
+        <aside className={`hidden lg:block flex-shrink-0 transition-all duration-500 ease-in-out overflow-hidden ${isSidebarOpen ? 'w-64 opacity-100' : 'w-0 opacity-0'}`}>
              <div className="w-64">
-                <ActivityFeed onClose={() => setIsSidebarOpen(false)} />
+                {/* 💥 CORRECTION ICI : On transmet currentUserId={user?.id} */}
+                <ActivityFeed onClose={() => setIsSidebarOpen(false)} currentUserId={user?.id} />
              </div>
         </aside>
 
-        {/* Contenu Principal */}
         <div className="flex-1 min-w-0 flex flex-col">
-            
-            {/* Bouton d'ouverture */}
             {!isSidebarOpen && (
                 <button 
                     onClick={() => setIsSidebarOpen(true)}
@@ -43,10 +36,10 @@ export default function HomeContainer({ initialData, user }: HomeContainerProps)
                 </button>
             )}
 
-            {/* Feed Mobile */}
             {isSidebarOpen && (
                 <div className="lg:hidden mb-8 animate-in slide-in-from-top duration-300 px-2">
-                    <ActivityFeed onClose={() => setIsSidebarOpen(false)} />
+                    {/* 💥 CORRECTION ICI AUSSI */}
+                    <ActivityFeed onClose={() => setIsSidebarOpen(false)} currentUserId={user?.id} />
                 </div>
             )}
 

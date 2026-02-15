@@ -110,25 +110,30 @@ export default function Navbar({ user: initialUser }: NavbarProps) {
             MyFrenchList
           </Link>
 
-          {/* Recherche Desktop (Input rapide) */}
+          {/* Recherche Desktop */}
           <div className="hidden md:block flex-1 max-w-sm mx-6">
              <SearchBar />
           </div>
 
           {/* Navigation Desktop */}
-          <div className="hidden md:flex items-center gap-1 lg:gap-4">
+          <div className="hidden lg:flex items-center gap-1 xl:gap-4">
             <Link href="/" className="text-gray-300 hover:text-white px-3 py-2 text-sm font-medium transition">Accueil</Link>
             
-            {/* Nouveau : Lien Recherche Avancée */}
             <Link href="/search" className="text-indigo-400 hover:text-indigo-300 px-3 py-2 text-sm font-bold transition flex items-center gap-1">
                 <span>🔍</span> Rechercher
             </Link>
 
             <Link href="/season" className="text-gray-300 hover:text-white px-3 py-2 text-sm font-medium transition">Saisons</Link>
+            
+            {/* NOUVEAU : Lien vers le Calendrier */}
+            <Link href="/calendar" className="text-gray-300 hover:text-white px-3 py-2 text-sm font-medium transition flex items-center gap-1">
+                <span>📅</span> Calendrier
+            </Link>
+
             <Link href="/friends" className="text-gray-300 hover:text-white px-3 py-2 text-sm font-medium transition">Communauté</Link>
 
             {user ? (
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 ml-2">
                 <Link href="/profile" className="flex items-center gap-2 hover:bg-white/5 p-1 rounded-full transition">
                   <div className="relative h-8 w-8 rounded-full overflow-hidden border border-gray-500">
                     {avatarUrl ? (
@@ -152,7 +157,7 @@ export default function Navbar({ user: initialUser }: NavbarProps) {
           </div>
 
           {/* Menu Button Mobile */}
-          <div className="md:hidden flex items-center">
+          <div className="lg:hidden flex items-center">
             <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-gray-300 hover:text-white p-2">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 {isMenuOpen ? <path d="M6 18L18 6M6 6l12 12" /> : <path d="M4 6h16M4 12h16m-7 6h7" />}
@@ -164,18 +169,22 @@ export default function Navbar({ user: initialUser }: NavbarProps) {
 
       {/* Mobile Menu */}
       {isMenuOpen && (
-        <div className="md:hidden bg-slate-900 border-b border-white/10 p-4 space-y-4 animate-in slide-in-from-top duration-300">
+        <div className="lg:hidden bg-slate-900 border-b border-white/10 p-4 space-y-4 animate-in slide-in-from-top duration-300">
           <SearchBar />
           <div className="flex flex-col gap-2">
             <Link href="/" className="p-3 text-gray-300 border-b border-white/5" onClick={() => setIsMenuOpen(false)}>Accueil</Link>
-            
-            {/* Nouveau : Lien Recherche Mobile */}
             <Link href="/search" className="p-3 text-indigo-400 font-bold border-b border-white/5 flex items-center gap-2" onClick={() => setIsMenuOpen(false)}>
                 <span>🔍</span> Recherche Avancée
             </Link>
-            
             <Link href="/season" className="p-3 text-gray-300 border-b border-white/5" onClick={() => setIsMenuOpen(false)}>Saisons</Link>
+            
+            {/* NOUVEAU : Lien Mobile vers le Calendrier */}
+            <Link href="/calendar" className="p-3 text-gray-300 border-b border-white/5 flex items-center gap-2" onClick={() => setIsMenuOpen(false)}>
+                <span>📅</span> Calendrier des sorties
+            </Link>
+            
             <Link href="/friends" className="p-3 text-gray-300 border-b border-white/5" onClick={() => setIsMenuOpen(false)}>Communauté</Link>
+            
             {user ? (
               <>
                 <Link href="/profile" className="p-3 text-gray-300" onClick={() => setIsMenuOpen(false)}>Mon Profil</Link>

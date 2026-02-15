@@ -1,6 +1,6 @@
 import { getMangaById, getRecommendations } from "../../lib/api";
 import Image from "next/image";
-import Link from "next/link"; // ✅ Import Link ajouté
+import Link from "next/link"; 
 import AddToListButton from "../../components/AddToListButton";
 import RatingComponent from "../../components/RatingComponent";
 import AnimeCard from "../../components/AnimeCard"; 
@@ -17,7 +17,24 @@ const InfoRow = ({ label, value }: { label: string, value: string | number | nul
     );
 };
 
-
+// ✅ AJOUT DES MÉTADONNÉES CORRECTEMENT TYPÉES
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  
+  if (!id) return { title: "Manga non trouvé" };
+  
+  const manga = await getMangaById(id);
+  
+  if (!manga) return { title: "Manga non trouvé" };
+  
+  return {
+    title: `${manga.title} - MyFrenchList`,
+    description: manga.synopsis?.slice(0, 160),
+    openGraph: {
+      images: [manga.images?.jpg?.large_image_url || ""],
+    },
+  };
+}
 
 export default async function MangaPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -31,11 +48,9 @@ export default async function MangaPage({ params }: { params: Promise<{ id: stri
   const genreIds = manga.genres?.map((g: any) => g.mal_id) || [];
   const recommendations = await getRecommendations(genreIds, 'manga', manga.mal_id);
 
-  // --- 1. EXTRACTION DES RELATIONS ---
   const relations = manga.relations || [];
   const prequels = relations.find((r: any) => r.relation === 'Prequel')?.entry || [];
   const sequels = relations.find((r: any) => r.relation === 'Sequel')?.entry || [];
-  // Tu peux aussi ajouter 'Adaptation' si tu veux voir l'anime lié au manga
   const adaptations = relations.find((r: any) => r.relation === 'Adaptation')?.entry || [];
 
   const authors = manga.authors?.map((a: any) => a.name).join(", ");
@@ -46,7 +61,6 @@ export default async function MangaPage({ params }: { params: Promise<{ id: stri
   return (
     <div className="min-h-screen bg-[#0f111a] text-white pb-20">
       
-      {/* HEADER BANNER */}
       <div className="relative h-[50vh] w-full overflow-hidden">
         <div className="absolute inset-0 opacity-40 blur-xl scale-110">
            {manga.images?.jpg?.large_image_url && (
@@ -84,7 +98,6 @@ export default async function MangaPage({ params }: { params: Promise<{ id: stri
       <div className="max-w-7xl mx-auto px-4 sm:px-6 relative -mt-16 z-20">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           
-          {/* --- COLONNE GAUCHE --- */}
           <div className="lg:col-span-1 flex flex-col gap-6">
             <div className="relative aspect-[2/3] w-full rounded-xl overflow-hidden shadow-2xl border-4 border-[#1e293b] bg-gray-800">
               {manga.images?.jpg?.large_image_url && (
@@ -124,7 +137,6 @@ export default async function MangaPage({ params }: { params: Promise<{ id: stri
                 </div>
             </div>
 
-            {/* --- 2. NOUVEAU BLOC : CHRONOLOGIE / RELATIONS --- */}
             {(prequels.length > 0 || sequels.length > 0 || adaptations.length > 0) && (
                 <div className="bg-[#1e293b]/50 p-5 rounded-xl border border-white/5 backdrop-blur-sm">
                     <h3 className="text-white font-bold mb-4 uppercase text-sm border-b border-white/10 pb-2 flex items-center gap-2">
@@ -168,7 +180,6 @@ export default async function MangaPage({ params }: { params: Promise<{ id: stri
                             </div>
                         )}
 
-                        {/* BONUS : Adaptations Anime */}
                         {adaptations.length > 0 && (
                             <div>
                                 <span className="text-xs font-bold text-gray-500 uppercase block mb-2">Anime</span>
@@ -199,7 +210,6 @@ export default async function MangaPage({ params }: { params: Promise<{ id: stri
              </div>
           </div>
 
-          {/* --- COLONNE DROITE --- */}
           <div className="lg:col-span-3 flex flex-col gap-8 pt-4 lg:pt-0">
             
             <section>
@@ -227,7 +237,6 @@ export default async function MangaPage({ params }: { params: Promise<{ id: stri
                 </div>
             </div>
 
-            {/* Auteurs Détails */}
              {manga.authors?.length > 0 && (
                 <section>
                     <h2 className="text-xl font-bold mb-4 text-white">Auteurs</h2>
@@ -247,7 +256,6 @@ export default async function MangaPage({ params }: { params: Promise<{ id: stri
                 </section>
             )}
 
-            {/* Recommandations */}
             {recommendations.length > 0 && (
                 <section className="mt-8 border-t border-white/10 pt-8">
                     <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">

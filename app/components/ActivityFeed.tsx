@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { createClient } from "../lib/supabase";
 import Image from "next/image";
 import Link from "next/link";
@@ -19,14 +19,46 @@ interface Activity {
   profiles?: { username: string; avatar_url: string };
 }
 
-// ✅ Ajout de la prop onClose
 interface ActivityFeedProps {
     onClose?: () => void;
+    currentUserId?: string; // ✅ Ajouté pour savoir qui est connecté
 }
 
-export default function ActivityFeed({ onClose }: ActivityFeedProps) {
+export default function ActivityFeed({ onClose, currentUserId }: ActivityFeedProps) {
   const [activities, setActivities] = useState<Activity[]>([]);
+  const [filter, setFilter] = useState<'all' | 'friends'>('all'); // ✅ État du filtre
+  const [loading, setLoading] = useState(true);
   const supabase = createClient();
+
+  const fetchActivities = useCallback(async () => {
+    setLoading(true);
+    try {
+      let query = supabase
+        .from('activities')
+        .select(`*, profiles (username, avatar_url)`)
+        .order('created_at', { ascending: false })
+        .limit(30);
+
+      // ✅ Logique du filtre "Amis"
+      if (filter === 'friends' && currentUserId) {
+        const { data: friends } = await supabase
+          .from('friends')
+          .select('friend_id')
+          .eq('user_id', currentUserId);
+        
+        const friendIds = friends?.map(f => f.friend_id) || [];
+        // On affiche les activités des amis + ses propres activités
+        query = query.in('user_id', [...friendIds, currentUserId]);
+      }
+
+      const { data } = await query;
+      if (data) setActivities(data as any);
+    } catch (error) {
+      console.error("Erreur lors de la récupération des activités", error);
+    } finally {
+      setLoading(false);
+    }
+  }, [filter, currentUserId, supabase]);
 
   useEffect(() => {
     fetchActivities();
@@ -35,16 +67,7 @@ export default function ActivityFeed({ onClose }: ActivityFeedProps) {
       (payload) => fetchActivities())
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, []);
-
-  async function fetchActivities() {
-    const { data } = await supabase
-      .from('activities')
-      .select(`*, profiles (username, avatar_url)`)
-      .order('created_at', { ascending: false })
-      .limit(30);
-    if (data) setActivities(data as any);
-  }
+  }, [fetchActivities, supabase]);
 
   const getActionText = (act: Activity) => {
       switch(act.action_type) {
@@ -58,12 +81,25 @@ export default function ActivityFeed({ onClose }: ActivityFeedProps) {
   return (
     <div className="bg-slate-900/50 border border-white/10 rounded-xl flex flex-col h-[450px] shadow-lg backdrop-blur-sm overflow-hidden">
         
-        {/* Header avec Bouton Fermer */}
+        {/* Header avec Filtres et Bouton Fermer */}
         <div className="p-3 border-b border-white/5 flex-shrink-0 bg-slate-900/80 flex justify-between items-center">
-            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                📡 Direct
-            </h3>
-            {/* ✅ Bouton visible uniquement si onClose existe */}
+            <div className="flex gap-4 items-center">
+                <button 
+                    onClick={() => setFilter('all')}
+                    className={`text-xs font-bold uppercase tracking-widest transition-colors ${filter === 'all' ? 'text-indigo-400' : 'text-gray-500 hover:text-gray-300'}`}
+                >
+                    📡 Direct
+                </button>
+                {currentUserId && (
+                    <button 
+                        onClick={() => setFilter('friends')}
+                        className={`text-xs font-bold uppercase tracking-widest transition-colors ${filter === 'friends' ? 'text-indigo-400' : 'text-gray-500 hover:text-gray-300'}`}
+                    >
+                        👥 Amis
+                    </button>
+                )}
+            </div>
+
             {onClose && (
                 <button 
                     onClick={onClose}
@@ -78,8 +114,12 @@ export default function ActivityFeed({ onClose }: ActivityFeedProps) {
         </div>
         
         <div className="overflow-y-auto p-2 space-y-3 custom-scrollbar flex-1">
-            {activities.length === 0 ? (
-                <div className="text-center py-8 opacity-50"><p className="text-xs">Aucune activité.</p></div>
+            {loading ? (
+                <div className="flex justify-center items-center h-full">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500"></div>
+                </div>
+            ) : activities.length === 0 ? (
+                <div className="text-center py-8 opacity-50"><p className="text-xs">Aucune activité trouvée.</p></div>
             ) : (
                 activities.map((act) => (
                     <div key={act.id} className="flex gap-2 items-start pb-2 border-b border-white/5 last:border-0 last:pb-0 animate-in fade-in slide-in-from-left-1">
