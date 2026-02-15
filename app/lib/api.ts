@@ -194,3 +194,7 @@ export async function getRecommendations(genres: number[], type: 'anime' | 'mang
         status: translateStatus(item.status)
     }));
 }
+export async function getSchedules() {
+  const data = await fetchWithCache("/schedules", 3600);
+  return data || [];
+}

@@ -5,6 +5,7 @@ import AddToListButton from "../../components/AddToListButton";
 import RatingComponent from "../../components/RatingComponent";
 import AnimeCard from "../../components/AnimeCard";
 import { createClient } from "../../lib/supabase/server";
+import { Metadata } from "next";
 
 // ... (Garde le composant InfoRow tel quel) ...
 const InfoRow = ({ label, value }: { label: string, value: string | number | null | undefined }) => {
@@ -16,7 +17,17 @@ const InfoRow = ({ label, value }: { label: string, value: string | number | nul
         </div>
     );
 };
-
+export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
+  const anime = await getAnimeById(params.id);
+  if (!anime) return { title: "Anime non trouvé" };
+  return {
+    title: `${anime.title} - MyFrenchList`,
+    description: anime.synopsis?.slice(0, 160),
+    openGraph: {
+      images: [anime.images?.jpg?.large_image_url || ""],
+    },
+  };
+}
 export default async function AnimePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   

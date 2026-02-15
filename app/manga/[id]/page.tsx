@@ -5,6 +5,7 @@ import AddToListButton from "../../components/AddToListButton";
 import RatingComponent from "../../components/RatingComponent";
 import AnimeCard from "../../components/AnimeCard"; 
 import { createClient } from "../../lib/supabase/server"; 
+import { Metadata } from "next";
 
 const InfoRow = ({ label, value }: { label: string, value: string | number | null | undefined }) => {
     if (!value) return null;
@@ -15,6 +16,8 @@ const InfoRow = ({ label, value }: { label: string, value: string | number | nul
         </div>
     );
 };
+
+
 
 export default async function MangaPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
