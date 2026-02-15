@@ -6,7 +6,7 @@ import RatingComponent from "../../components/RatingComponent";
 import AnimeCard from "../../components/AnimeCard"; 
 import { createClient } from "../../lib/supabase/server"; 
 import { Metadata } from "next";
-
+import ReviewSection from "../../components/ReviewSection";
 const InfoRow = ({ label, value }: { label: string, value: string | number | null | undefined }) => {
     if (!value) return null;
     return (
@@ -269,7 +269,7 @@ export default async function MangaPage({ params }: { params: Promise<{ id: stri
                     </div>
                 </section>
             )}
-
+            <ReviewSection mediaId={manga.mal_id} mediaType="anime" currentUserId={user?.id} />
           </div>
         </div>
       </div>
