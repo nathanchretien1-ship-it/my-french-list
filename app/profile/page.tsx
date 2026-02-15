@@ -3,9 +3,9 @@ import { redirect } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import AnimeCard from "../components/AnimeCard";
-import AddToListButton from "../components/AddToListButton";
 import ProfileStats from "../components/ProfileStats";
-import AutoSyncGenres from "../components/AutoSyncGenres"; // ✅ Import du composant invisible
+import AutoSyncGenres from "../components/AutoSyncGenres"; 
+import AchievementsList from "../components/AchievementsList"; // ✅ Import des succès
 import { getRank } from "../lib/ranks";
 
 export default async function ProfilePage() {
@@ -50,11 +50,11 @@ export default async function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-[#0f111a] pt-24 pb-12 px-4 sm:px-6 lg:px-8">
-      {/* 💥 Composant invisible qui vérifie et met à jour les genres en base de données */}
       <AutoSyncGenres items={items} userId={user.id} />
 
       <div className="max-w-7xl mx-auto space-y-8">
         
+        {/* HEADER */}
         <div className="flex flex-col md:flex-row items-center gap-8 bg-slate-900/50 p-8 rounded-3xl border border-white/5 backdrop-blur-sm shadow-xl">
             <div className="relative w-32 h-32 rounded-full overflow-hidden border-4 border-indigo-500 shadow-2xl">
                 {avatarUrl ? (
@@ -85,32 +85,43 @@ export default async function ProfilePage() {
             </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-slate-900/30 p-6 rounded-2xl border border-white/5 text-center shadow-inner flex flex-col justify-center">
+        {/* --- NOUVELLE GRILLE : STATS + GRAPH + SUCCÈS --- */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            
+            {/* Colonne 1 : Les 4 blocs de chiffres */}
+            <div className="lg:col-span-1 grid grid-cols-2 lg:grid-cols-1 gap-4">
+                <div className="bg-slate-900/30 p-4 rounded-2xl border border-white/5 text-center flex flex-col justify-center">
                     <div className="text-3xl font-black text-white mb-1">{totalItems}</div>
                     <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Total</div>
                 </div>
-                <div className="bg-slate-900/30 p-6 rounded-2xl border border-white/5 text-center shadow-inner flex flex-col justify-center">
+                <div className="bg-slate-900/30 p-4 rounded-2xl border border-white/5 text-center flex flex-col justify-center">
                     <div className="text-3xl font-black text-green-400 mb-1">{completedCount}</div>
                     <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Terminés</div>
                 </div>
-                <div className="bg-slate-900/30 p-6 rounded-2xl border border-white/5 text-center shadow-inner flex flex-col justify-center">
+                <div className="bg-slate-900/30 p-4 rounded-2xl border border-white/5 text-center flex flex-col justify-center">
                     <div className="text-3xl font-black text-indigo-400 mb-1">{planCount}</div>
                     <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">À voir</div>
                 </div>
-                <div className="bg-slate-900/30 p-6 rounded-2xl border border-white/5 text-center shadow-inner flex flex-col justify-center">
+                <div className="bg-slate-900/30 p-4 rounded-2xl border border-white/5 text-center flex flex-col justify-center">
                     <div className="text-3xl font-black text-yellow-400 mb-1">★ {avgScore}</div>
                     <div className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Moyenne</div>
                 </div>
             </div>
             
-            <div className="lg:col-span-1">
+            {/* Colonne 2 : Le graphique */}
+            <div className="lg:col-span-1 h-full">
                 <ProfileStats items={items} />
+            </div>
+
+            {/* Colonne 3 & 4 : Les Succès */}
+            <div className="lg:col-span-2 h-full">
+                {/* 💥 Intégration du composant des succès */}
+                <AchievementsList library={items} />
             </div>
         </div>
 
-        <div className="space-y-6">
+        {/* MA COLLECTION */}
+        <div className="space-y-6 pt-4">
             <h2 className="text-2xl font-bold text-white border-l-4 border-indigo-500 pl-4">Ma Collection</h2>
             {items.length === 0 ? (
                 <div className="text-center py-20 bg-slate-900/20 rounded-2xl border border-white/5 border-dashed">
