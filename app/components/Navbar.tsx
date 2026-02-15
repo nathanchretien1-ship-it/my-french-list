@@ -17,7 +17,7 @@ export default function Navbar({ user: initialUser }: NavbarProps) {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [pseudo, setPseudo] = useState<string>("");
   const [unreadCount, setUnreadCount] = useState<number>(0);
-  const [isMenuOpen, setIsMenuOpen] = useState(false); // État pour le menu mobile
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const [supabase] = useState(() => createClient());
   const router = useRouter();
@@ -110,23 +110,29 @@ export default function Navbar({ user: initialUser }: NavbarProps) {
             MyFrenchList
           </Link>
 
-          {/* Recherche Desktop */}
-          <div className="hidden md:block flex-1 max-w-md mx-8">
+          {/* Recherche Desktop (Input rapide) */}
+          <div className="hidden md:block flex-1 max-w-sm mx-6">
              <SearchBar />
           </div>
 
           {/* Navigation Desktop */}
-          <div className="hidden md:flex items-center gap-4">
+          <div className="hidden md:flex items-center gap-1 lg:gap-4">
             <Link href="/" className="text-gray-300 hover:text-white px-3 py-2 text-sm font-medium transition">Accueil</Link>
+            
+            {/* Nouveau : Lien Recherche Avancée */}
+            <Link href="/search" className="text-indigo-400 hover:text-indigo-300 px-3 py-2 text-sm font-bold transition flex items-center gap-1">
+                <span>🔍</span> Rechercher
+            </Link>
+
             <Link href="/season" className="text-gray-300 hover:text-white px-3 py-2 text-sm font-medium transition">Saisons</Link>
             <Link href="/friends" className="text-gray-300 hover:text-white px-3 py-2 text-sm font-medium transition">Communauté</Link>
 
             {user ? (
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
                 <Link href="/profile" className="flex items-center gap-2 hover:bg-white/5 p-1 rounded-full transition">
                   <div className="relative h-8 w-8 rounded-full overflow-hidden border border-gray-500">
                     {avatarUrl ? (
-                      <Image src={avatarUrl} alt="Avatar" fill className="object-cover" sizes="32px" />
+                      <Image src={avatarUrl} alt="Avatar" fill className="object-cover" sizes="32px" priority />
                     ) : (
                       <div className="h-full w-full bg-purple-600 flex items-center justify-center text-xs font-bold text-white">
                         {pseudo.charAt(0).toUpperCase()}
@@ -135,9 +141,7 @@ export default function Navbar({ user: initialUser }: NavbarProps) {
                   </div>
                 </Link>
                 <button onClick={handleLogout} className="text-gray-400 hover:text-red-400 p-2 transition">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15M12 9l-3 3m0 0 3 3m-3-3h12.75" />
-                  </svg>
+                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
                 </button>
               </div>
             ) : (
@@ -163,16 +167,22 @@ export default function Navbar({ user: initialUser }: NavbarProps) {
         <div className="md:hidden bg-slate-900 border-b border-white/10 p-4 space-y-4 animate-in slide-in-from-top duration-300">
           <SearchBar />
           <div className="flex flex-col gap-2">
-            <Link href="/" className="p-2 text-gray-300" onClick={() => setIsMenuOpen(false)}>Accueil</Link>
-            <Link href="/season" className="p-2 text-gray-300" onClick={() => setIsMenuOpen(false)}>Saisons</Link>
-            <Link href="/friends" className="p-2 text-gray-300" onClick={() => setIsMenuOpen(false)}>Communauté</Link>
+            <Link href="/" className="p-3 text-gray-300 border-b border-white/5" onClick={() => setIsMenuOpen(false)}>Accueil</Link>
+            
+            {/* Nouveau : Lien Recherche Mobile */}
+            <Link href="/search" className="p-3 text-indigo-400 font-bold border-b border-white/5 flex items-center gap-2" onClick={() => setIsMenuOpen(false)}>
+                <span>🔍</span> Recherche Avancée
+            </Link>
+            
+            <Link href="/season" className="p-3 text-gray-300 border-b border-white/5" onClick={() => setIsMenuOpen(false)}>Saisons</Link>
+            <Link href="/friends" className="p-3 text-gray-300 border-b border-white/5" onClick={() => setIsMenuOpen(false)}>Communauté</Link>
             {user ? (
               <>
-                <Link href="/profile" className="p-2 text-gray-300" onClick={() => setIsMenuOpen(false)}>Mon Profil</Link>
-                <button onClick={handleLogout} className="p-2 text-left text-red-400">Déconnexion</button>
+                <Link href="/profile" className="p-3 text-gray-300" onClick={() => setIsMenuOpen(false)}>Mon Profil</Link>
+                <button onClick={handleLogout} className="p-3 text-left text-red-400">Déconnexion</button>
               </>
             ) : (
-              <Link href="/auth" className="p-2 text-indigo-400 font-bold" onClick={() => setIsMenuOpen(false)}>Connexion</Link>
+              <Link href="/auth" className="p-3 text-white font-bold bg-indigo-600 rounded-xl text-center" onClick={() => setIsMenuOpen(false)}>Connexion</Link>
             )}
           </div>
         </div>

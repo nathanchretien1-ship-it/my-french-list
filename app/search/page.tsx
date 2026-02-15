@@ -3,7 +3,14 @@ import { useState, useEffect } from "react";
 import AnimeCard from "../components/AnimeCard";
 import { fetchAdvancedMediaList } from "../action";
 import { createClient } from "../lib/supabase"; 
-import { useSearchParams, useRouter } from "next/navigation";
+import { toast } from "sonner";
+
+const GENRES = [
+  { id: 1, name: "Action" }, { id: 2, name: "Aventure" }, { id: 4, name: "Comédie" },
+  { id: 8, name: "Drame" }, { id: 10, name: "Fantasy" }, { id: 14, name: "Horreur" },
+  { id: 7, name: "Mystère" }, { id: 22, name: "Romance" }, { id: 24, name: "Sci-Fi" },
+  { id: 36, name: "Slice of Life" }, { id: 30, name: "Sports" }
+];
 
 export default function SearchPage() {
   const [items, setItems] = useState<any[]>([]);
@@ -14,127 +21,148 @@ export default function SearchPage() {
   const [query, setQuery] = useState("");
   const [mediaType, setMediaType] = useState<'anime' | 'manga'>('anime');
   const [status, setStatus] = useState('all');
+  const [format, setFormat] = useState('all');
   const [sort, setSort] = useState('bypopularity');
+  const [minScore, setMinScore] = useState(0);
+  const [selectedGenres, setSelectedGenres] = useState<number[]>([]);
+  const [rating, setRating] = useState('all');
 
   const supabase = createClient();
-  const router = useRouter();
-  const searchParams = useSearchParams();
 
-  // 1. Charger l'utilisateur au montage
   useEffect(() => {
-      supabase.auth.getUser().then(({ data }) => setUser(data.user));
+    supabase.auth.getUser().then(({ data }) => setUser(data.user));
   }, []);
 
-  // 2. Lancer la recherche
   const handleSearch = async () => {
-      setLoading(true);
-      const data = await fetchAdvancedMediaList(mediaType, 1, {
-          query: query,
-          status: status,
-          sort: sort
-      });
-      // Déduplication
-      const uniqueData = new Map();
-      (data || []).data.forEach((item: any) => uniqueData.set(item.mal_id, item));
-      setItems(Array.from(uniqueData.values()));
-      setLoading(false);
+    setLoading(true);
+    const result = await fetchAdvancedMediaList(mediaType, 1, {
+      query,
+      status: status !== 'all' ? status : undefined,
+      format: format !== 'all' ? format : undefined,
+      sort,
+      min_score: minScore > 0 ? minScore : undefined,
+      genres: selectedGenres.length > 0 ? selectedGenres.join(',') : undefined,
+      rating: mediaType === 'anime' && rating !== 'all' ? rating : undefined
+    });
+
+    if (result.error) toast.error(result.error);
+    else setItems(result.data || []);
+    setLoading(false);
   };
 
-  // 3. Recherche automatique au changement de filtres (Debounce sur le texte)
   useEffect(() => {
-      const timeoutId = setTimeout(() => {
-          handleSearch();
-      }, 500); // Attend 500ms après la fin de la frappe
-      return () => clearTimeout(timeoutId);
-  }, [query, mediaType, status, sort]);
+    const timer = setTimeout(handleSearch, 500);
+    return () => clearTimeout(timer);
+  }, [query, mediaType, status, format, sort, minScore, selectedGenres, rating]);
 
   return (
-    <div className="min-h-screen bg-[#0f111a] pt-24 pb-12 px-4">
-        <div className="max-w-7xl mx-auto">
-            
-            <h1 className="text-3xl font-black text-white mb-8 flex items-center gap-3">
-                🔍 Recherche Avancée
-            </h1>
+    <div className="min-h-screen bg-slate-950 pt-24 pb-12 px-4">
+      <div className="max-w-7xl mx-auto">
+        <h1 className="text-3xl font-black text-white mb-8">🔍 Recherche Avancée</h1>
 
-            {/* --- BARRE DE FILTRES --- */}
-            <div className="bg-[#1e293b]/50 border border-white/5 p-6 rounded-2xl mb-8 space-y-6">
-                
-                {/* 1. Champ Texte */}
-                <div className="relative">
-                    <input 
-                        type="text" 
-                        placeholder="Rechercher un titre (ex: One Piece, Naruto...)" 
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        className="w-full bg-slate-900/80 border border-white/10 text-white rounded-xl px-5 py-4 pl-12 focus:outline-none focus:border-indigo-500 transition text-lg"
-                    />
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6 text-gray-500 absolute left-4 top-1/2 -translate-y-1/2">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-                    </svg>
-                </div>
+        <div className="bg-slate-900/50 border border-white/10 p-6 rounded-2xl mb-8 space-y-6">
+          {/* Barre de recherche principale */}
+          <input 
+            type="text" 
+            placeholder="Nom de l'oeuvre..." 
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="w-full bg-slate-950 border border-white/10 text-white rounded-xl px-4 py-3 focus:border-indigo-500 outline-none transition"
+          />
 
-                {/* 2. Sélecteurs */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    
-                    {/* Type */}
-                    <div className="flex bg-slate-800 p-1 rounded-lg">
-                        <button 
-                            onClick={() => setMediaType('anime')}
-                            className={`flex-1 py-2 rounded-md text-sm font-bold transition ${mediaType === 'anime' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`}
-                        >
-                            Animes
-                        </button>
-                        <button 
-                            onClick={() => setMediaType('manga')}
-                            className={`flex-1 py-2 rounded-md text-sm font-bold transition ${mediaType === 'manga' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`}
-                        >
-                            Mangas
-                        </button>
-                    </div>
-
-                    {/* Statut */}
-                    <select 
-                        value={status} 
-                        onChange={(e) => setStatus(e.target.value)}
-                        className="bg-slate-800 text-white border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500"
-                    >
-                        <option value="all">Tous les statuts</option>
-                        <option value={mediaType === 'anime' ? 'airing' : 'publishing'}>En cours</option>
-                        <option value="complete">Terminé</option>
-                        <option value="upcoming">À venir</option>
-                    </select>
-
-                    {/* Tri */}
-                    <select 
-                        value={sort} 
-                        onChange={(e) => setSort(e.target.value)}
-                        className="bg-slate-800 text-white border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:border-indigo-500"
-                    >
-                        <option value="bypopularity">Popularité</option>
-                        <option value="score">Note</option>
-                        <option value="newest">Récent</option>
-                    </select>
-                </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Type & Format */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-500 uppercase">Support</label>
+              <select value={mediaType} onChange={(e) => { setMediaType(e.target.value as any); setFormat('all'); }} className="w-full bg-slate-800 text-white rounded-lg p-2 border border-white/5 outline-none">
+                <option value="anime">Anime</option>
+                <option value="manga">Manga</option>
+              </select>
+              <select value={format} onChange={(e) => setFormat(e.target.value)} className="w-full bg-slate-800 text-white rounded-lg p-2 border border-white/5 outline-none">
+                <option value="all">Tous les formats</option>
+                {mediaType === 'anime' ? (
+                  <>
+                    <option value="tv">Série TV</option>
+                    <option value="movie">Film</option>
+                    <option value="ova">OVA</option>
+                    <option value="special">Spécial</option>
+                  </>
+                ) : (
+                  <>
+                    <option value="manga">Manga</option>
+                    <option value="novel">Light Novel</option>
+                    <option value="one_shot">One Shot</option>
+                  </>
+                )}
+              </select>
             </div>
 
-            {/* --- RÉSULTATS --- */}
-            {loading ? (
-                <div className="text-center py-20">
-                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-500"></div>
-                </div>
-            ) : items.length === 0 ? (
-                <div className="text-center py-20 text-gray-500">
-                    {query ? "Aucun résultat trouvé..." : "Commencez à taper pour rechercher."}
-                </div>
-            ) : (
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
-                    {items.map((item) => (
-                        <AnimeCard key={`${item.mal_id}-${mediaType}`} anime={item} type={mediaType} user={user} />
-                    ))}
-                </div>
-            )}
+            {/* Note & Statut */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-500 uppercase">Critères</label>
+              <select value={minScore} onChange={(e) => setMinScore(Number(e.target.value))} className="w-full bg-slate-800 text-white rounded-lg p-2 border border-white/5 outline-none text-yellow-400 font-bold">
+                <option value="0">Toutes les notes</option>
+                {[9, 8, 7, 6].map(n => <option key={n} value={n}>Note {n}+ ★</option>)}
+              </select>
+              <select value={status} onChange={(e) => setStatus(e.target.value)} className="w-full bg-slate-800 text-white rounded-lg p-2 border border-white/5 outline-none">
+                <option value="all">Tous les statuts</option>
+                <option value={mediaType === 'anime' ? 'airing' : 'publishing'}>En cours</option>
+                <option value="complete">Terminé</option>
+                <option value="upcoming">À venir</option>
+              </select>
+            </div>
 
+            {/* Tri & Public (Rating) */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-500 uppercase">Tri & Public</label>
+              <select value={sort} onChange={(e) => setSort(e.target.value)} className="w-full bg-slate-800 text-white rounded-lg p-2 border border-white/5 outline-none">
+                <option value="bypopularity">Popularité</option>
+                <option value="score">Mieux notés</option>
+                <option value="newest">Sortie récente</option>
+              </select>
+              {mediaType === 'anime' && (
+                <select value={rating} onChange={(e) => setRating(e.target.value)} className="w-full bg-slate-800 text-white rounded-lg p-2 border border-white/5 outline-none">
+                  <option value="all">Tous publics</option>
+                  <option value="pg13">Ados (PG-13)</option>
+                  <option value="r17">Adultes (R-17)</option>
+                </select>
+              )}
+            </div>
+
+            {/* Genres */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-bold text-gray-500 uppercase">Genres</label>
+              <div className="bg-slate-800 rounded-lg p-2 h-[84px] overflow-y-auto border border-white/5 flex flex-wrap gap-1 custom-scrollbar">
+                {GENRES.map(g => (
+                  <button 
+                    key={g.id} 
+                    onClick={() => setSelectedGenres(prev => prev.includes(g.id) ? prev.filter(x => x !== g.id) : [...prev, g.id])}
+                    className={`text-[9px] px-2 py-1 rounded-full border transition ${selectedGenres.includes(g.id) ? 'bg-indigo-600 border-indigo-400 text-white' : 'bg-slate-900 border-white/10 text-gray-400'}`}
+                  >
+                    {g.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
+
+        {/* Liste de résultats */}
+        {loading ? (
+          <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-10 w-10 border-t-2 border-indigo-500"></div></div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
+            {items.map((item) => (
+              <AnimeCard 
+                key={`${item.mal_id}-${mediaType}`} 
+                anime={item} // ✅ On utilise "anime" car c'est ce qu'attend le composant
+                type={mediaType} 
+                user={user} 
+              />
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

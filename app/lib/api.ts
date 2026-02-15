@@ -80,7 +80,6 @@ export async function getTopContent(type: 'anime' | 'manga', page = 1, filter: '
   return [];
 }
 
-// ✨ FONCTION DE RECHERCHE AVANCÉE & FILTRES
 export async function getAdvancedContent(
   type: 'anime' | 'manga', 
   page = 1, 
@@ -89,45 +88,43 @@ export async function getAdvancedContent(
     status?: string;
     format?: string;
     sort?: string;
+    genres?: string;    // IDs séparés par des virgules
+    min_score?: number; // Note minimale
+    rating?: string;    // PG13, R17, etc (Anime uniquement)
   }
 ) {
   let queryParams = `page=${page}&limit=24&sfw=true`;
 
-  // 1. Recherche Texte
-  if (filters.query && filters.query.trim() !== '') {
-      queryParams += `&q=${encodeURIComponent(filters.query)}`;
+  // 1. Recherche texte
+  if (filters.query?.trim()) {
+    queryParams += `&q=${encodeURIComponent(filters.query)}`;
   }
 
-  // 2. Statut
-  if (filters.status && filters.status !== 'all') {
-      queryParams += `&status=${filters.status}`;
-  }
+  // 2. Filtres de précision
+  if (filters.status && filters.status !== 'all') queryParams += `&status=${filters.status}`;
+  if (filters.format && filters.format !== 'all') queryParams += `&type=${filters.format}`;
+  if (filters.min_score && filters.min_score > 0) queryParams += `&min_score=${filters.min_score}`;
+  if (filters.genres) queryParams += `&genres=${filters.genres}`;
+  if (filters.rating && filters.rating !== 'all') queryParams += `&rating=${filters.rating}`;
 
-  // 3. Format
-  if (filters.format && filters.format !== 'all') {
-      queryParams += `&type=${filters.format}`;
-  }
-
-  // 4. Tri
+  // 3. Tri (Order By & Sort)
   if (filters.sort === 'score') {
-      queryParams += '&order_by=score&sort=desc';
+    queryParams += '&order_by=score&sort=desc';
   } else if (filters.sort === 'newest') {
-      queryParams += '&order_by=start_date&sort=desc';
+    queryParams += '&order_by=start_date&sort=desc';
   } else {
-      // Par défaut : Popularité (sauf si recherche texte, Jikan gère la pertinence seul, mais on force popularité si vide)
-      if (!filters.query) {
-          queryParams += '&order_by=members&sort=desc';
-      }
+    // Par défaut Popularité, sauf si recherche texte (Jikan gère la pertinence)
+    if (!filters.query) queryParams += '&order_by=members&sort=desc';
   }
 
   const endpoint = type === 'anime' ? '/anime' : '/manga';
   const data = await fetchWithCache(`${endpoint}?${queryParams}`, 3600);
   
   if (data) {
-      return data.map((item: any) => ({
-          ...item,
-          status: translateStatus(item.status)
-      }));
+    return data.map((item: any) => ({
+      ...item,
+      status: translateStatus(item.status)
+    }));
   }
   return [];
 }

@@ -19,13 +19,15 @@ export async function fetchAdvancedMediaList(
         status?: string;
         format?: string;
         sort?: string;
+        genres?: string;
+        min_score?: number;
+        rating?: string;
     }
 ) {
   try {
     const data = await getAdvancedContent(type, page, filters);
     return { data, error: null };
   } catch (error) {
-    console.error("Erreur fetchAdvancedMediaList:", error);
     return { data: [], error: "Erreur lors de la recherche." };
   }
 }
